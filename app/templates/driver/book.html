@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+
+{% block title %}Book & Pay — {{ space.title }} — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm p-4 p-md-5">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-3 border-bottom flex-wrap gap-2">
+                    <div>
+                        <div class="badge bg-primary-subtle text-primary fw-bold px-3 py-1 rounded-pill mb-1">
+                            COMMUNITY PARKING RESERVATION
+                        </div>
+                        <h4 class="fw-bold mb-0">Reserve & Checkout</h4>
+                        <p class="text-muted small mb-0">{{ space.title }} ({{ space.locality }})</p>
+                    </div>
+                    {% if is_emergency %}
+                        <span class="badge bg-danger p-2 px-3 rounded-pill fw-bold">
+                            <i class="bi bi-lightning-charge-fill me-1"></i> EMERGENCY PRIORITY
+                        </span>
+                    {% endif %}
+                </div>
+
+                <!-- Live Slot Checking Alert -->
+                <div id="liveAvailabilityNotice" class="alert alert-info py-2 small mb-4">
+                    <i class="bi bi-info-circle me-1"></i> Select your arrival date and hours below to verify open capacity.
+                </div>
+
+                <form id="bookingForm" method="POST" action="{{ url_for('driver.book', space_id=space.id, emergency=(1 if is_emergency else 0)) }}">
+                    <input type="hidden" id="parking_space_id" value="{{ space.id }}">
+                    <input type="hidden" id="pricePerHourVal" value="{{ space.price_per_hour }}">
+                    
+                    <!-- Hidden Payment Form Fields -->
+                    <input type="hidden" name="payment_method" id="selectedPaymentMethod" value="UPI / Google Pay">
+                    <input type="hidden" name="payment_transaction_id" id="selectedTransactionId" value="">
+                    <input type="hidden" name="payment_status" id="selectedPaymentStatus" value="PAID">
+
+                    <!-- SECTION 1: TIME & VEHICLE DETAILS -->
+                    <h6 class="fw-bold text-dark text-uppercase small mb-3">
+                        <span class="badge bg-primary rounded-circle me-1" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">1</span>
+                        Parking Schedule & Vehicle
+                    </h6>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Reservation Date</label>
+                        <input type="date" name="booking_date" id="booking_date" class="form-control form-control-lg" required>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Arrival Time</label>
+                            <input type="time" name="start_time" id="start_time" class="form-control form-control-lg" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Exit Time</label>
+                            <input type="time" name="end_time" id="end_time" class="form-control form-control-lg" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Vehicle Type</label>
+                            <select name="vehicle_type" class="form-select form-select-lg" required>
+                                <option value="Car">Car / 4-Wheeler</option>
+                                <option value="Two Wheeler">Two Wheeler / Motorcycle</option>
+                                <option value="SUV">SUV</option>
+                                <option value="EV">Electric Vehicle</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Vehicle Registration No.</label>
+                            <input type="text" name="vehicle_plate" class="form-control form-control-lg text-uppercase font-monospace" placeholder="e.g. KA01AB1234" required>
+                        </div>
+                    </div>
+
+                    <!-- Price Summary Card -->
+                    <div class="p-3 bg-light rounded-3 border mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">Hourly Rate:</span>
+                            <span class="fw-semibold text-dark">{{ space.price_per_hour|currency }}/hr</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">Operating Window:</span>
+                            <span class="fw-semibold text-dark">{{ space.operating_start.strftime('%H:%M') }} - {{ space.operating_end.strftime('%H:%M') }}</span>
+                        </div>
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong class="text-dark fs-6">Total Payable Amount:</strong>
+                            <strong class="fs-4 text-primary" id="dynamicPriceDisplay">₹{{ space.price_per_hour }}</strong>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 2: 100% FREE & EASY PAYMENT GATEWAY -->
+                    <h6 class="fw-bold text-dark text-uppercase small mb-3">
+                        <span class="badge bg-primary rounded-circle me-1" style="width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;">2</span>
+                        Select Payment Method (Free & Secure)
+                    </h6>
+
+                    <!-- Payment Method Tabs -->
+                    <div class="card border mb-4 shadow-sm overflow-hidden">
+                        <ul class="nav nav-pills nav-fill bg-light p-2 border-bottom gap-1" id="paymentTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active rounded-pill fw-bold btn-sm py-2" id="tab-upi" data-bs-toggle="pill" data-bs-target="#content-upi" type="button" onclick="setPaymentMethod('UPI / Google Pay')">
+                                    <i class="bi bi-qr-code me-1 text-success"></i> UPI & QR Code
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link rounded-pill fw-bold btn-sm py-2" id="tab-card" data-bs-toggle="pill" data-bs-target="#content-card" type="button" onclick="setPaymentMethod('Credit / Debit Card')">
+                                    <i class="bi bi-credit-card-2-front me-1 text-primary"></i> Card (Visa/MC)
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link rounded-pill fw-bold btn-sm py-2" id="tab-nb" data-bs-toggle="pill" data-bs-target="#content-nb" type="button" onclick="setPaymentMethod('Net Banking')">
+                                    <i class="bi bi-bank me-1 text-info"></i> Net Banking
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link rounded-pill fw-bold btn-sm py-2" id="tab-cash" data-bs-toggle="pill" data-bs-target="#content-cash" type="button" onclick="setPaymentMethod('Pay on Arrival')">
+                                    <i class="bi bi-cash-stack me-1 text-warning"></i> Pay at Gate
+                                </button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content p-4" id="paymentTabContent">
+                            <!-- TAB 1: UPI & QR -->
+                            <div class="tab-pane fade show active" id="content-upi" role="tabpanel">
+                                <!-- Direct Owner Payout Banner -->
+                                <div class="card border-success border-opacity-25 bg-success-subtle bg-opacity-10 p-3 rounded-3 mb-3">
+                                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="avatar-circle bg-success text-white fw-bold d-flex align-items-center justify-content-center rounded-circle" style="width: 36px; height: 36px; font-size: 1rem;">
+                                                {{ (space.owner.name[0] if space.owner and space.owner.name else 'P')|upper }}
+                                            </div>
+                                            <div>
+                                                <div class="small text-muted mb-0" style="font-size: 0.72rem; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Direct Space Owner Payee</div>
+                                                <div class="fw-bold text-dark fs-6">{{ space.owner.name if space.owner and space.owner.name else 'Space Owner' }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-white text-dark border font-monospace px-2 py-1" id="vpaDisplay">{{ upi_data.payee_vpa }}</span>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="copyUpiId()" title="Copy UPI ID">
+                                                <i class="bi bi-clipboard"></i> Copy
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 pt-2 border-top border-success border-opacity-25 d-flex align-items-center justify-content-between small text-success fw-semibold" style="font-size: 0.78rem;">
+                                        <span><i class="bi bi-shield-fill-check me-1"></i> 100% Free Direct P2P Transfer</span>
+                                        <span class="text-muted">Zero Platform Deductions</span>
+                                    </div>
+                                </div>
+
+                                <!-- Multi-Provider Selector Pills -->
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold text-muted text-uppercase mb-2" style="font-size: 0.75rem;">
+                                        Select Your UPI Provider / App:
+                                    </label>
+                                    <div class="d-flex flex-wrap gap-2" id="providerSelector">
+                                        <button type="button" class="btn btn-sm btn-dark rounded-pill px-3 fw-semibold provider-btn active" data-provider="generic" onclick="selectProvider('generic', this)">
+                                            <i class="bi bi-qr-code me-1"></i> All UPI Apps
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold provider-btn" data-provider="phonepe" onclick="selectProvider('phonepe', this)" style="border-color: #5f259f; color: #5f259f;">
+                                            <i class="bi bi-phone me-1"></i> PhonePe
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold provider-btn" data-provider="gpay" onclick="selectProvider('gpay', this)" style="border-color: #1a73e8; color: #1a73e8;">
+                                            <i class="bi bi-google me-1"></i> Google Pay
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-3 fw-semibold provider-btn" data-provider="paytm" onclick="selectProvider('paytm', this)" style="border-color: #002970; color: #002970;">
+                                            <i class="bi bi-wallet2 me-1"></i> Paytm
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold provider-btn" data-provider="bhim" onclick="selectProvider('bhim', this)">
+                                            <i class="bi bi-check-circle me-1"></i> BHIM UPI
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {% if space.upi_qr_image %}
+                                <!-- QR Display Toggle: Dynamic vs Owner Scanner -->
+                                <div class="d-flex justify-content-center mb-3">
+                                    <div class="btn-group btn-group-sm p-1 bg-light rounded-pill border" role="group">
+                                        <button type="button" id="btnDynamicQr" class="btn btn-sm btn-primary rounded-pill px-3 active fw-semibold" onclick="toggleQrView('dynamic')">
+                                            ⚡ Dynamic Amount QR
+                                        </button>
+                                        <button type="button" id="btnOwnerQr" class="btn btn-sm btn-light rounded-pill px-3 text-muted fw-semibold" onclick="toggleQrView('owner')">
+                                            📷 Owner's Uploaded Scanner
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <div class="row align-items-center">
+                                    <!-- QR Image Container -->
+                                    <div class="col-md-5 mb-3 mb-md-0 text-center">
+                                        <div class="p-2 border rounded-3 d-inline-block bg-white shadow-sm position-relative">
+                                            <!-- Dynamic QR image -->
+                                            <img id="upiQrImage" src="{{ upi_data.qr_base64 }}" alt="UPI Payment QR" style="width: 175px; height: 175px; object-fit: contain;">
+                                            {% if space.upi_qr_image %}
+                                            <!-- Owner uploaded scanner image -->
+                                            <img id="ownerQrImage" src="{{ url_for('static', filename='uploads/' ~ space.upi_qr_image) }}" alt="Owner's UPI Scanner" class="d-none" style="width: 175px; height: 175px; object-fit: contain;">
+                                            {% endif %}
+                                        </div>
+                                        <div id="qrCaption" class="small text-muted mt-1 fw-bold" style="font-size:0.75rem;">
+                                            Scan with PhonePe, GPay, or Paytm
+                                        </div>
+                                    </div>
+
+                                    <!-- Action and Verification Column -->
+                                    <div class="col-md-7 text-start ps-md-3">
+                                        <div class="badge bg-success-subtle text-success fw-bold px-3 py-1 rounded-pill mb-2">
+                                            <i class="bi bi-lightning-charge-fill me-1"></i> Instant Auto-Pay Ready
+                                        </div>
+                                        <h6 class="fw-bold mb-1">Pay Direct to Owner Bank</h6>
+                                        <p class="text-muted small mb-2">Scan the QR code with your UPI app or tap below on mobile to launch your UPI app directly.</p>
+
+                                        <!-- Mobile Deep-Link Trigger -->
+                                        <div class="d-flex flex-wrap gap-2 mb-3">
+                                            <a id="openUpiAppBtn" href="{{ upi_data.upi_uri }}" class="btn btn-outline-dark btn-sm rounded-pill px-3 fw-semibold">
+                                                <i class="bi bi-box-arrow-up-right me-1"></i> Open in UPI App
+                                            </a>
+                                            <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-semibold" onclick="simulateInstantPay('UPI / Google Pay')">
+                                                <i class="bi bi-lightning-fill me-1"></i> Test 1-Click Verification
+                                            </button>
+                                        </div>
+
+                                        <!-- Optional UTR / Reference Entry -->
+                                        <div class="p-2 bg-light rounded-2 border">
+                                            <label class="form-label small text-muted mb-1" style="font-size: 0.75rem;">
+                                                <i class="bi bi-receipt me-1"></i> UPI Ref No. / UTR (Optional)
+                                            </label>
+                                            <input type="text" id="driverUtrInput" class="form-control form-control-sm font-monospace" placeholder="e.g. 423987123456" maxlength="24">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- TAB 2: CREDIT / DEBIT CARD -->
+                            <div class="tab-pane fade" id="content-card" role="tabpanel">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="fw-bold mb-0">Card Details (Simulated Test Gateway)</h6>
+                                    <button type="button" class="btn btn-link btn-sm text-decoration-none fw-bold p-0" onclick="fillTestCard()">
+                                        <i class="bi bi-magic me-1"></i> Fill Test Card
+                                    </button>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">Card Number</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white"><i class="bi bi-credit-card text-primary"></i></span>
+                                        <input type="text" id="mockCardNumber" class="form-control font-monospace" placeholder="4532 &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; 8921" maxlength="19">
+                                    </div>
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label class="form-label small text-muted">Expiry (MM/YY)</label>
+                                        <input type="text" id="mockCardExpiry" class="form-control text-center" placeholder="12/28" maxlength="5">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label small text-muted">CVV</label>
+                                        <input type="password" id="mockCardCvv" class="form-control text-center" placeholder="882" maxlength="4">
+                                    </div>
+                                </div>
+                                <small class="text-muted" style="font-size:0.75rem;"><i class="bi bi-shield-check text-success me-1"></i> 256-Bit SSL Encrypted Sandbox Gateway</small>
+                            </div>
+
+                            <!-- TAB 3: NET BANKING -->
+                            <div class="tab-pane fade" id="content-nb" role="tabpanel">
+                                <h6 class="fw-bold mb-2">Select Your Bank</h6>
+                                <p class="text-muted small mb-3">Authenticate directly with your retail or corporate net banking portal.</p>
+                                <select id="mockBankSelect" class="form-select mb-3">
+                                    <option value="State Bank of India">State Bank of India (SBI)</option>
+                                    <option value="HDFC Bank" selected>HDFC Bank</option>
+                                    <option value="ICICI Bank">ICICI Bank</option>
+                                    <option value="Axis Bank">Axis Bank</option>
+                                    <option value="Kotak Mahindra Bank">Kotak Mahindra Bank</option>
+                                    <option value="Punjab National Bank">Punjab National Bank</option>
+                                </select>
+                                <div class="p-2 bg-light rounded-2 text-muted small border">
+                                    <i class="bi bi-info-circle me-1 text-primary"></i> You will be redirected for OTP verification upon confirmation.
+                                </div>
+                            </div>
+
+                            <!-- TAB 4: PAY AT GATE -->
+                            <div class="tab-pane fade" id="content-cash" role="tabpanel">
+                                <div class="text-center py-2">
+                                    <div class="fs-1 text-warning mb-2"><i class="bi bi-cash-coin"></i></div>
+                                    <h6 class="fw-bold text-dark mb-1">Pay on Arrival at Bay</h6>
+                                    <p class="text-muted small mb-3">Settle the parking fee directly with the space owner in cash or via their personal UPI sign when parking.</p>
+                                    <span class="badge bg-secondary px-3 py-1 rounded-pill">Status: UNPAID (Settle at bay)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CONFIRM & PAY BUTTON -->
+                    <button type="button" id="paySubmitBtn" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow-sm fs-6" onclick="initiatePaymentFlow()">
+                        <i class="bi bi-lock-fill me-1"></i> Pay & Confirm Reservation
+                    </button>
+                    
+                    <div class="text-center text-muted small mt-2">
+                        <i class="bi bi-check2-circle text-success me-1"></i> Free Instant Confirmation &bull; Tax Invoice Issued Instantly
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- BANKING PROCESSING OVERLAY -->
+<div id="paymentOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-flex align-items-center justify-content-center" style="z-index: 2000;">
+    <div class="card border-0 shadow-lg p-4 text-center rounded-4" style="max-width: 360px; width: 90%;">
+        <div id="overlaySpinner" class="spinner-border text-primary mb-3 mx-auto" style="width: 3.5rem; height: 3.5rem;" role="status"></div>
+        <div id="overlaySuccessIcon" class="d-none text-success mb-2">
+            <i class="bi bi-check-circle-fill" style="font-size: 3.5rem;"></i>
+        </div>
+        <h5 id="overlayTitle" class="fw-bold mb-1">Processing Payment...</h5>
+        <p id="overlayMessage" class="text-muted small mb-0">Communicating with banking network. Please do not refresh.</p>
+        <div id="overlayTxnTag" class="d-none mt-2 font-monospace small text-primary fw-bold"></div>
+    </div>
+</div>
+
+<script>
+    let currentMethod = 'UPI / Google Pay';
+    let currentProvider = 'generic';
+    let currentCalculatedPrice = {{ space.price_per_hour }};
+    const hourlyRate = {{ space.price_per_hour }};
+    const spaceId = {{ space.id }};
+    let providerLinks = {{ upi_data.provider_links|tojson }};
+
+    function setPaymentMethod(method) {
+        currentMethod = method;
+        document.getElementById('selectedPaymentMethod').value = method;
+        if (method === 'Pay on Arrival') {
+            document.getElementById('selectedPaymentStatus').value = 'PENDING';
+            document.getElementById('paySubmitBtn').innerHTML = '<i class="bi bi-check-circle me-1"></i> Confirm Booking (Pay at Gate)';
+        } else {
+            document.getElementById('selectedPaymentStatus').value = 'PAID';
+            document.getElementById('paySubmitBtn').innerHTML = '<i class="bi bi-lock-fill me-1"></i> Pay & Confirm Reservation';
+        }
+    }
+
+    function selectProvider(provider, btnElement) {
+        currentProvider = provider;
+        document.querySelectorAll('.provider-btn').forEach(btn => {
+            btn.classList.remove('active', 'btn-dark');
+            btn.classList.add('btn-outline-primary');
+        });
+        if (btnElement) {
+            btnElement.classList.add('active', 'btn-dark');
+            btnElement.classList.remove('btn-outline-primary', 'btn-outline-info', 'btn-outline-success');
+        }
+
+        // Update deep-link
+        if (providerLinks && providerLinks[provider]) {
+            document.getElementById('openUpiAppBtn').href = providerLinks[provider];
+        }
+
+        // Re-fetch dynamic QR tailored for this provider
+        fetchUpiQr(currentCalculatedPrice, provider);
+    }
+
+    function toggleQrView(mode) {
+        const dynImg = document.getElementById('upiQrImage');
+        const ownImg = document.getElementById('ownerQrImage');
+        const btnDyn = document.getElementById('btnDynamicQr');
+        const btnOwn = document.getElementById('btnOwnerQr');
+        const caption = document.getElementById('qrCaption');
+
+        if (mode === 'owner' && ownImg) {
+            dynImg.classList.add('d-none');
+            ownImg.classList.remove('d-none');
+            btnOwn.classList.add('active', 'btn-primary');
+            btnOwn.classList.remove('btn-light', 'text-muted');
+            btnDyn.classList.remove('active', 'btn-primary');
+            btnDyn.classList.add('btn-light', 'text-muted');
+            caption.textContent = "Owner's Personal UPI Scanner";
+        } else {
+            if (ownImg) ownImg.classList.add('d-none');
+            dynImg.classList.remove('d-none');
+            btnDyn.classList.add('active', 'btn-primary');
+            btnDyn.classList.remove('btn-light', 'text-muted');
+            if (btnOwn) {
+                btnOwn.classList.remove('active', 'btn-primary');
+                btnOwn.classList.add('btn-light', 'text-muted');
+            }
+            caption.textContent = "Scan with PhonePe, GPay, or Paytm";
+        }
+    }
+
+    function copyUpiId() {
+        const vpa = document.getElementById('vpaDisplay').textContent.trim();
+        navigator.clipboard.writeText(vpa).then(() => {
+            alert("Owner UPI ID copied to clipboard: " + vpa);
+        }).catch(() => {
+            prompt("Owner UPI ID:", vpa);
+        });
+    }
+
+    function fetchUpiQr(amount, provider) {
+        fetch(`/driver/api/payment/upi-qr?space_id=${spaceId}&amount=${amount}&provider=${provider}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.qr_base64) {
+                    document.getElementById('upiQrImage').src = data.qr_base64;
+                }
+                if (data.provider_links) {
+                    providerLinks = data.provider_links;
+                    const link = providerLinks[provider] || data.upi_uri;
+                    document.getElementById('openUpiAppBtn').href = link;
+                }
+            })
+            .catch(err => console.error("Error updating UPI details:", err));
+    }
+
+    function recalculateTotal() {
+        const startTime = document.getElementById('start_time').value;
+        const endTime = document.getElementById('end_time').value;
+        if (!startTime || !endTime) return;
+
+        const [sH, sM] = startTime.split(':').map(Number);
+        const [eH, eM] = endTime.split(':').map(Number);
+
+        let durationHours = (eH + eM / 60) - (sH + sM / 60);
+        if (durationHours <= 0) durationHours += 24; // spans past midnight
+        durationHours = Math.max(1, Math.round(durationHours * 10) / 10);
+
+        currentCalculatedPrice = Math.round(durationHours * hourlyRate);
+        const displayEl = document.getElementById('dynamicPriceDisplay');
+        if (displayEl) {
+            displayEl.textContent = `₹${currentCalculatedPrice}`;
+        }
+
+        fetchUpiQr(currentCalculatedPrice, currentProvider);
+    }
+
+    function fillTestCard() {
+        document.getElementById('mockCardNumber').value = '4532 8912 3456 7890';
+        document.getElementById('mockCardExpiry').value = '12/28';
+        document.getElementById('mockCardCvv').value = '882';
+    }
+
+    function simulateInstantPay(method) {
+        setPaymentMethod(method);
+        initiatePaymentFlow();
+    }
+
+    function initiatePaymentFlow() {
+        const form = document.getElementById('bookingForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        // Pick user-entered UTR if available or generate authentic standard ref
+        const customUtr = (document.getElementById('driverUtrInput')?.value || '').trim();
+        let txnId = customUtr;
+        if (!txnId) {
+            const randomHex = Math.random().toString(16).substring(2, 10).toUpperCase();
+            let prefix = 'UPI';
+            if (currentMethod.includes('Card')) prefix = 'CARD';
+            else if (currentMethod.includes('Bank')) prefix = 'NB';
+            else if (currentMethod.includes('Arrival')) prefix = 'CASH';
+            txnId = `TXN-${prefix}-2026-${randomHex}`;
+        }
+
+        document.getElementById('selectedTransactionId').value = txnId;
+
+        // Display Banking Overlay Animation
+        const overlay = document.getElementById('paymentOverlay');
+        const title = document.getElementById('overlayTitle');
+        const msg = document.getElementById('overlayMessage');
+        const spinner = document.getElementById('overlaySpinner');
+        const successIcon = document.getElementById('overlaySuccessIcon');
+        const txnTag = document.getElementById('overlayTxnTag');
+
+        overlay.classList.remove('d-none');
+
+        if (currentMethod === 'Pay on Arrival') {
+            title.textContent = "Confirming Reservation...";
+            msg.textContent = "Reserving your parking slot. Payment due on arrival.";
+            setTimeout(() => {
+                form.submit();
+            }, 1000);
+            return;
+        }
+
+        // Simulated bank verification steps
+        title.textContent = `Verifying with ${currentMethod}...`;
+        msg.textContent = `Routing ₹${currentCalculatedPrice} directly to space owner bank account...`;
+
+        setTimeout(() => {
+            title.textContent = "Payment Confirmed!";
+            msg.textContent = "Direct transfer verified. Generating your check-in pass...";
+            spinner.classList.add('d-none');
+            successIcon.classList.remove('d-none');
+            txnTag.textContent = `UTR / Ref: ${txnId}`;
+            txnTag.classList.remove('d-none');
+
+            setTimeout(() => {
+                form.submit();
+            }, 900);
+        }, 1200);
+    }
+
+    // Default dates, times, and dynamic price recalculation
+    document.addEventListener('DOMContentLoaded', () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const today = `${year}-${month}-${day}`;
+
+        const dateInput = document.getElementById('booking_date');
+        const startTimeInput = document.getElementById('start_time');
+        const endTimeInput = document.getElementById('end_time');
+
+        dateInput.min = today;
+        dateInput.value = today;
+
+        const startH = String(now.getHours()).padStart(2, '0');
+        const startM = String(Math.ceil(now.getMinutes()/15)*15 % 60).padStart(2, '0');
+        startTimeInput.value = `${startH}:${startM}`;
+        
+        const endH = String((now.getHours() + 2) % 24).padStart(2, '0');
+        endTimeInput.value = `${endH}:${startM}`;
+
+        startTimeInput.addEventListener('change', recalculateTotal);
+        endTimeInput.addEventListener('change', recalculateTotal);
+        recalculateTotal();
+    });
+</script>
+{% endblock %}

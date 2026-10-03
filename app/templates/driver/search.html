@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}Search Parking Spaces — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-lg-5 py-4">
+    <!-- Top Filter Bar -->
+    <div class="card border-0 shadow-sm p-3 mb-4">
+        <form action="{{ url_for('driver.search') }}" method="GET" class="row g-2 align-items-center">
+            <div class="col-md-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="locality" class="form-control" placeholder="Locality, City, Landmark" value="{{ query_locality }}">
+                </div>
+            </div>
+
+            <div class="col-md-2">
+                <select name="vehicle_type" class="form-select">
+                    <option value="">Vehicle Type</option>
+                    <option value="Car" {% if vehicle_type == 'Car' %}selected{% endif %}>Car / Sedan / Hatchback</option>
+                    <option value="Two Wheeler" {% if vehicle_type == 'Two Wheeler' %}selected{% endif %}>Two Wheeler / Bike</option>
+                    <option value="SUV" {% if vehicle_type == 'SUV' %}selected{% endif %}>SUV</option>
+                    <option value="EV" {% if vehicle_type == 'EV' %}selected{% endif %}>EV Charging</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <select name="parking_type" class="form-select">
+                    <option value="">Parking Type</option>
+                    <option value="Private Driveway" {% if parking_type == 'Private Driveway' %}selected{% endif %}>Driveway</option>
+                    <option value="Covered Garage" {% if parking_type == 'Covered Garage' %}selected{% endif %}>Covered Garage</option>
+                    <option value="Residential" {% if parking_type == 'Residential' %}selected{% endif %}>Residential</option>
+                    <option value="Commercial" {% if parking_type == 'Commercial' %}selected{% endif %}>Commercial</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <select name="sort_by" class="form-select">
+                    <option value="rating" {% if sort_by == 'rating' %}selected{% endif %}>Highest Rated</option>
+                    <option value="price_asc" {% if sort_by == 'price_asc' %}selected{% endif %}>Price: Low to High</option>
+                    <option value="price_desc" {% if sort_by == 'price_desc' %}selected{% endif %}>Price: High to Low</option>
+                </select>
+            </div>
+
+            <input type="hidden" name="lat" id="latInput" value="{{ user_lat or '' }}">
+            <input type="hidden" name="lng" id="lngInput" value="{{ user_lng or '' }}">
+
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary flex-grow-1 fw-bold">
+                    <i class="bi bi-funnel me-1"></i> Apply
+                </button>
+                <button type="button" id="detectLocationBtn" class="btn btn-outline-secondary" title="Use GPS Location">
+                    <i class="bi bi-geo-alt-fill"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="row g-4">
+        <!-- Results Column -->
+        <div class="col-lg-7">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0">{{ spaces|length }} Parking Spaces Found</h5>
+                {% if user_lat and user_lng %}
+                    <span class="badge bg-success-subtle text-success border border-success">
+                        <i class="bi bi-crosshair me-1"></i> Sorted by Proximity
+                    </span>
+                {% endif %}
+            </div>
+
+            {% if spaces %}
+                <div class="d-flex flex-column gap-3">
+                    {% for space in spaces %}
+                        {% set pred = predictions.get(space.id) %}
+                        <div class="card border-0 shadow-sm card-hover overflow-hidden">
+                            <div class="row g-0">
+                                <div class="col-md-4 position-relative" style="min-height: 160px; background-color: #e2e8f0;">
+                                    <img src="{{ url_for('static', filename='uploads/' + space.image_url) }}" 
+                                         onerror="this.src='https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=400&auto=format&fit=crop&q=80'"
+                                         class="w-100 h-100 object-fit-cover" alt="{{ space.title }}">
+                                    <span class="position-absolute top-0 start-0 m-2 badge bg-primary px-2 py-1">
+                                        {{ space.parking_type }}
+                                    </span>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="card-body p-3 d-flex flex-column h-100">
+                                        <div class="d-flex justify-content-between align-items-start mb-1">
+                                            <h5 class="fw-bold mb-0 text-dark">{{ space.title }}</h5>
+                                            <div class="fs-5 fw-bold text-primary">{{ space.price_per_hour|currency }}<small class="fs-6 text-muted">/hr</small></div>
+                                        </div>
+
+                                        <p class="text-muted small mb-2">
+                                            <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ space.address }}, {{ space.locality }}
+                                            {% if space.distance_km is defined and space.distance_km is not none %}
+                                                <span class="fw-bold text-dark ms-2">({{ space.distance_km }} km away)</span>
+                                            {% endif %}
+                                        </p>
+
+                                        <!-- Smart Prediction Indicator -->
+                                        {% if pred %}
+                                            <div class="d-flex align-items-center gap-2 mb-3">
+                                                <span class="badge bg-{{ pred.badge_class }}-subtle text-{{ pred.badge_class }} border border-{{ pred.badge_class }} px-2 py-1 rounded-pill" style="font-size: 0.72rem;">
+                                                    <i class="bi bi-cpu-fill me-1"></i>{{ pred.category }}
+                                                </span>
+                                                <small class="text-muted" style="font-size: 0.75rem;">{{ pred.explanation }}</small>
+                                            </div>
+                                        {% endif %}
+
+                                        <div class="mt-auto d-flex justify-content-between align-items-center pt-2 border-top">
+                                            <div class="small">
+                                                <span class="badge bg-light text-dark border me-1"><i class="bi bi-star-fill text-warning me-1"></i>{{ space.average_rating }}</span>
+                                                <span class="text-muted">({{ space.review_count }} reviews)</span>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-2" onclick="if(window.focusSpaceMarker) window.focusSpaceMarker({{ space.id }})" title="Highlight on Map">
+                                                    <i class="bi bi-geo-alt-fill me-1"></i> Pin
+                                                </button>
+                                                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-2" onclick="startTurnByTurnNavigation({{ space.latitude }}, {{ space.longitude }}, '{{ space.title|replace("'", "\\'") }}')" title="Start Real-Time GPS Navigation">
+                                                    <i class="bi bi-cursor-fill me-1"></i> Track GPS
+                                                </button>
+                                                <a href="https://www.google.com/maps/dir/?api=1&destination={{ space.latitude }},{{ space.longitude }}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm rounded-pill px-2" title="Navigate in Google Maps">
+                                                    <i class="bi bi-map-fill me-1"></i> Maps
+                                                </a>
+                                                <a href="{{ url_for('driver.details', space_id=space.id) }}" class="btn btn-primary btn-sm rounded-pill px-3 fw-semibold">
+                                                    Book
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card border-0 shadow-sm p-5 text-center text-muted">
+                    <i class="bi bi-emoji-frown fs-1 mb-2 text-secondary"></i>
+                    <h5 class="fw-bold text-dark">No Parking Spaces Found</h5>
+                    <p class="small mb-0">Try expanding your search query or selecting "All Vehicles".</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Interactive Map Column -->
+        <div class="col-lg-5">
+            <div class="sticky-top" style="top: 80px; z-index: 5;">
+                <div class="card border-0 shadow-sm p-3">
+                    <h6 class="fw-bold mb-2 d-flex align-items-center gap-1">
+                        <i class="bi bi-map-fill text-primary"></i> Interactive Parking Map
+                    </h6>
+                    <div id="searchMap" style="height: 520px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/maps.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const spacesData = [
+        {% for s in spaces %}
+        {
+            id: {{ s.id }},
+            title: {{ s.title|tojson }},
+            locality: {{ s.locality|tojson }},
+            price_per_hour: {{ s.price_per_hour }},
+            latitude: {{ s.latitude }},
+            longitude: {{ s.longitude }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const centerLat = {{ user_lat or (spaces[0].latitude if spaces else 12.9716) }};
+    const centerLng = {{ user_lng or (spaces[0].longitude if spaces else 77.5946) }};
+
+    initSearchMap('searchMap', spacesData, centerLat, centerLng);
+});
+</script>
+{% endblock %}

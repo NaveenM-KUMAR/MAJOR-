@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}{{ space.title }} — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('driver.search') }}" class="text-decoration-none">Search</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('driver.search', locality=space.locality) }}" class="text-decoration-none">{{ space.locality }}</a></li>
+            <li class="breadcrumb-item active">{{ space.title }}</li>
+        </ol>
+    </nav>
+
+    <div class="row g-4">
+        <!-- Main Details Column -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm overflow-hidden mb-4">
+                <div class="position-relative" style="height: 320px; background-color: #cbd5e1;">
+                    <img src="{{ url_for('static', filename='uploads/' + space.image_url) }}" 
+                         onerror="this.src='https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=1000&auto=format&fit=crop&q=80'"
+                         class="w-100 h-100 object-fit-cover" alt="{{ space.title }}">
+                    <span class="position-absolute top-0 end-0 m-3 badge bg-slate px-3 py-2 fs-6 rounded-pill">
+                        {{ space.price_per_hour|currency }} / hour
+                    </span>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h2 class="fw-bold mb-1 text-dark">{{ space.title }}</h2>
+                            <p class="text-muted"><i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ space.address }}, {{ space.locality }}, {{ space.city }}</p>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge bg-light text-dark border fs-6 px-3 py-2">
+                                <i class="bi bi-star-fill text-warning me-1"></i>{{ space.average_rating }}
+                                <small class="text-muted">({{ space.review_count }} reviews)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Smart Prediction Card -->
+                    <div class="p-3 bg-light rounded-3 border border-{{ prediction.badge_class }} mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-{{ prediction.badge_class }}-subtle text-{{ prediction.badge_class }} border border-{{ prediction.badge_class }} px-3 py-1 rounded-pill fw-bold">
+                                <i class="bi bi-cpu-fill me-1"></i> Prediction: {{ prediction.category }}
+                            </span>
+                            <span class="small fw-semibold text-muted">Demand Level: {{ prediction.demand_level }}</span>
+                        </div>
+                        <p class="small text-muted mb-0 mt-2">{{ prediction.explanation }}</p>
+                    </div>
+
+                    <!-- Description -->
+                    <h5 class="fw-bold mb-2">About this space</h5>
+                    <p class="text-secondary mb-4">{{ space.description }}</p>
+
+                    <!-- Features & Amenities -->
+                    <h5 class="fw-bold mb-3">Specifications & Facilities</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <small class="text-muted d-block">Parking Type</small>
+                                <strong class="text-dark">{{ space.parking_type }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <small class="text-muted d-block">Operating Hours</small>
+                                <strong class="text-dark">{{ space.operating_start.strftime('%I:%M %p') }} – {{ space.operating_end.strftime('%I:%M %p') }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <small class="text-muted d-block">Supported Vehicles</small>
+                                <strong class="text-dark">{{ space.vehicle_types }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <small class="text-muted d-block">Total Capacity</small>
+                                <strong class="text-dark">{{ space.total_slots }} Slot(s)</strong>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <small class="text-muted d-block">Available Days</small>
+                                <strong class="text-dark">{{ space.available_days }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-4">
+                            <div class="p-3 bg-light rounded-3 border">
+                                <small class="text-muted d-block">Amenities</small>
+                                <strong class="text-dark">{{ space.amenities or 'Standard' }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Space Rules -->
+                    {% if space.rules %}
+                        <h5 class="fw-bold mb-2">Parking Rules</h5>
+                        <div class="p-3 bg-warning-subtle rounded-3 border border-warning mb-4">
+                            <p class="small mb-0 text-dark">{{ space.rules }}</p>
+                        </div>
+                    {% endif %}
+
+                    <!-- Location Map -->
+                    <h5 class="fw-bold mb-2">Location & GPS Coordinates</h5>
+                    <div id="detailsMap" class="mb-4" style="height: 300px;"></div>
+
+                    <!-- Reviews Section -->
+                    <h5 class="fw-bold mb-3">Driver Reviews ({{ reviews|length }})</h5>
+                    {% if reviews %}
+                        <div class="d-flex flex-column gap-3">
+                            {% for r in reviews %}
+                                <div class="p-3 bg-light rounded-3 border">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <div class="fw-bold text-dark">{{ r.reviewer.name }}</div>
+                                        <div class="text-warning">
+                                            {% for i in range(r.rating) %}<i class="bi bi-star-fill"></i>{% endfor %}
+                                        </div>
+                                    </div>
+                                    <p class="small text-secondary mb-1">{{ r.comment }}</p>
+                                    <small class="text-muted" style="font-size: 0.72rem;">{{ r.created_at.strftime('%b %d, %Y') }}</small>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted small">No reviews yet for this space. Be the first to park and leave feedback!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sticky Booking Action Sidebar -->
+        <div class="col-lg-4">
+            <div class="sticky-top" style="top: 80px; z-index: 5;">
+                <div class="card border-0 shadow-sm p-4">
+                    <h4 class="fw-bold mb-1">{{ space.price_per_hour|currency }} <small class="text-muted fs-6">/ hour</small></h4>
+                    {% if space.price_per_day %}
+                        <p class="text-muted small mb-3">or {{ space.price_per_day|currency }} per day</p>
+                    {% endif %}
+
+                    <hr class="my-3">
+
+                    <div class="d-flex flex-column gap-2 mb-3">
+                        <a href="{{ url_for('driver.book', space_id=space.id) }}" class="btn btn-primary btn-lg rounded-pill fw-bold py-2 shadow-sm">
+                            <i class="bi bi-calendar2-check me-2"></i> Reserve This Space
+                        </a>
+                        <button type="button" onclick="startTurnByTurnNavigation({{ space.latitude }}, {{ space.longitude }}, '{{ space.title|replace("'", "\\'") }}')" class="btn btn-outline-success rounded-pill py-2 fw-bold">
+                            <i class="bi bi-cursor-fill me-2"></i> Start Turn-by-Turn GPS Tracking
+                        </button>
+                        <a href="https://www.google.com/maps/dir/?api=1&destination={{ space.latitude }},{{ space.longitude }}" target="_blank" rel="noopener" class="btn btn-outline-secondary rounded-pill py-2 fw-semibold">
+                            <i class="bi bi-map-fill me-2 text-danger"></i> Open in Google Maps
+                        </a>
+                    </div>
+
+                    <div class="p-3 bg-light rounded-3 small text-muted">
+                        <i class="bi bi-shield-lock-fill text-success me-1"></i>
+                        <strong>Secure Reservation:</strong> Instant QR token generated upon owner confirmation.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/maps.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    initDetailsMap('detailsMap', {{ space.latitude }}, {{ space.longitude }}, {{ space.title|tojson }}, {{ space.address|tojson }});
+});
+</script>
+{% endblock %}

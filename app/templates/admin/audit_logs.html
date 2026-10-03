@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Logs — Admin Console{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-lg-5 py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-0">System Security & Audit Trail</h3>
+            <p class="text-muted small mb-0">Traceable historical actions, verifications, bookings, and check-ins</p>
+        </div>
+    </div>
+
+    {% if logs %}
+        <div class="card border-0 shadow-sm overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Actor / User</th>
+                            <th>Action Event</th>
+                            <th>Target Entity</th>
+                            <th>Details</th>
+                            <th>IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                            <tr>
+                                <td class="small text-muted font-monospace">{{ log.created_at|format_datetime }}</td>
+                                <td>
+                                    {% if log.actor %}
+                                        <strong class="text-dark">{{ log.actor.name }}</strong>
+                                        <small class="text-muted d-block">({{ log.actor.role }})</small>
+                                    {% else %}
+                                        <span class="text-muted">System / Public</span>
+                                    {% endif %}
+                                </td>
+                                <td><span class="badge bg-secondary font-monospace">{{ log.action }}</span></td>
+                                <td>{{ log.target_entity }}:{{ log.target_id or 'N/A' }}</td>
+                                <td style="max-width: 320px;"><small class="text-dark">{{ log.details }}</small></td>
+                                <td class="font-monospace small text-muted">{{ log.ip_address or '127.0.0.1' }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="card border-0 shadow-sm p-5 text-center text-muted">
+            <p class="mb-0">No audit logs recorded yet.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}How It Works — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="text-center max-w-700 mx-auto mb-5">
+        <h6 class="text-primary fw-bold text-uppercase">Platform Guide</h6>
+        <h1 class="fw-extrabold display-5">How Community Parking Works</h1>
+        <p class="lead text-muted">A collaborative platform designed to unlock unused private and community parking capacity while reducing street traffic and illegal roadside parking.</p>
+    </div>
+
+    <!-- Dual Role Workflow Tabs -->
+    <div class="row g-5">
+        <!-- Driver Workflow -->
+        <div class="col-lg-6">
+            <div class="card h-100 p-4 border-0 shadow-sm border-top border-primary border-4">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="p-3 bg-primary-subtle text-primary rounded-circle fs-3">
+                        <i class="bi bi-car-front-fill"></i>
+                    </div>
+                    <div>
+                        <h3 class="fw-bold mb-0">For Drivers</h3>
+                        <p class="text-muted small mb-0">Find, reserve, and park seamlessly</p>
+                    </div>
+                </div>
+
+                <div class="timeline ps-3">
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-primary rounded-pill me-2">1</span> Search & Filter</h6>
+                        <p class="text-muted small">Search by destination locality, radius, price, or vehicle type. Toggle Emergency Mode for urgent immediate parking.</p>
+                    </div>
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-primary rounded-pill me-2">2</span> Smart Availability Check</h6>
+                        <p class="text-muted small">View intelligent demand predictions (Likely Available, Occupied Soon, High Demand Area) and guaranteed open slot checks.</p>
+                    </div>
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-primary rounded-pill me-2">3</span> Book & Receive QR Ticket</h6>
+                        <p class="text-muted small">Confirm date, time, and vehicle number. Once approved, your encrypted QR code ticket is generated.</p>
+                    </div>
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-primary rounded-pill me-2">4</span> Navigate & Self-Service Check-In</h6>
+                        <p class="text-muted small">Launch 1-click Google Maps GPS navigation, scan the space's wall-mounted QR sign with your phone camera to check in, and rate on departure.</p>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-3 border-top">
+                    <a href="{{ url_for('driver.search') }}" class="btn btn-primary w-100 py-2 rounded-pill fw-bold">
+                        Find Parking Now
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Property Owner Workflow -->
+        <div class="col-lg-6">
+            <div class="card h-100 p-4 border-0 shadow-sm border-top border-success border-4">
+                <div class="d-flex align-items-center gap-3 mb-4">
+                    <div class="p-3 bg-success-subtle text-success rounded-circle fs-3">
+                        <i class="bi bi-buildings-fill"></i>
+                    </div>
+                    <div>
+                        <h3 class="fw-bold mb-0">For Property Owners</h3>
+                        <p class="text-muted small mb-0">Monetize unused driveways & garages</p>
+                    </div>
+                </div>
+
+                <div class="timeline ps-3">
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-success rounded-pill me-2">1</span> Register & Verify</h6>
+                        <p class="text-muted small">Create an owner account and submit identity/address details for admin verification to ensure community safety.</p>
+                    </div>
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-success rounded-pill me-2">2</span> List Parking Spaces</h6>
+                        <p class="text-muted small">Specify address, GPS coordinates, vehicle types, available slots, operating hours, amenities, and hourly pricing.</p>
+                    </div>
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-success rounded-pill me-2">3</span> Approve Bookings</h6>
+                        <p class="text-muted small">Review incoming reservation requests with full visibility into driver name, vehicle plate, and schedule.</p>
+                    </div>
+                    <div class="mb-4 position-relative">
+                        <h6 class="fw-bold text-dark"><span class="badge bg-success rounded-pill me-2">4</span> Print Wall Sign & Track Revenue</h6>
+                        <p class="text-muted small">Print your space's unique wall-mounted QR signboard for autonomous driver check-ins, and track real-time revenue on your dashboard.</p>
+                    </div>
+                </div>
+
+                <div class="mt-auto pt-3 border-top">
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-success w-100 py-2 rounded-pill fw-bold">
+                        Become a Parking Owner
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

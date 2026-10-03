@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Owner Revenue & Analytics — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+        <div>
+            <h2 class="fw-bold mb-1">Financial & Utilization Analytics</h2>
+            <p class="text-muted small mb-0">Track revenue, occupancy trends, and performance across your listed spaces</p>
+        </div>
+        <button class="btn btn-outline-secondary rounded-pill btn-sm" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i> Export Report
+        </button>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card kpi-success">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Total Realized Revenue</small>
+                <div class="fs-4 fw-extrabold text-success">{{ analytics.total_revenue|currency }}</div>
+                <small class="text-muted">{{ analytics.completed_bookings }} completed bookings</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Average Booking Value</small>
+                <div class="fs-4 fw-extrabold text-primary">₹{{ analytics.average_order_value }}</div>
+                <small class="text-muted">Per completed reservation</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card kpi-warning">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Current Utilization</small>
+                <div class="fs-4 fw-extrabold text-dark">{{ analytics.utilization_rate }}%</div>
+                <small class="text-muted">Occupancy rate today</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Active Properties</small>
+                <div class="fs-4 fw-extrabold text-dark">{{ analytics.total_spaces }}</div>
+                <small class="text-muted">Listed community spaces</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-12">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-graph-up text-primary"></i> 7-Day Revenue Trend (₹)
+                </h5>
+                <div style="height: 280px;">
+                    <canvas id="revenueTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Space-by-Space Performance Table -->
+    <div class="card border-0 shadow-sm overflow-hidden mb-4">
+        <div class="card-header bg-white py-3 border-bottom">
+            <h5 class="fw-bold mb-0">Earnings Breakdown by Parking Listing</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Space Title</th>
+                        <th>Locality</th>
+                        <th>Capacity</th>
+                        <th>Bookings Handled</th>
+                        <th>Average Rating</th>
+                        <th>Gross Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if analytics.space_performance %}
+                        {% for sp in analytics.space_performance %}
+                            <tr>
+                                <td class="fw-bold text-dark">{{ sp.title }}</td>
+                                <td>{{ sp.locality }}</td>
+                                <td>{{ sp.slots }} slot(s)</td>
+                                <td>{{ sp.bookings_count }}</td>
+                                <td><span class="badge bg-light text-dark border"><i class="bi bi-star-fill text-warning me-1"></i>{{ sp.rating }}</span></td>
+                                <td class="text-success fw-bold">{{ sp.revenue|currency }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center py-4 text-muted">No space performance data yet.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const labels = {{ analytics.daily_revenue_labels|tojson }};
+    const data = {{ analytics.daily_revenue_data|tojson }};
+    renderRevenueChart('revenueTrendChart', labels, data);
+});
+</script>
+{% endblock %}

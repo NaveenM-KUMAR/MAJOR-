@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm p-4">
+                <h3 class="fw-bold mb-1">{{ title }}</h3>
+                <p class="text-muted small mb-4">Provide accurate details, rates, and operating hours for your space.</p>
+
+                <form method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Space Title / Name</label>
+                        <input type="text" name="title" class="form-control" placeholder="e.g. Spacious Covered Driveway near Metro" value="{{ space.title if space else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Full Address</label>
+                        <input type="text" name="address" class="form-control" placeholder="House #, Street name" value="{{ space.address if space else '' }}" required>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Locality / Area</label>
+                            <input type="text" name="locality" class="form-control" placeholder="e.g. Koramangala" value="{{ space.locality if space else '' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">City</label>
+                            <input type="text" name="city" class="form-control" placeholder="e.g. Bangalore" value="{{ space.city if space else 'Bangalore' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label fw-semibold small mb-0">GPS Coordinates</label>
+                        <button type="button" class="btn btn-outline-primary btn-sm rounded-pill py-0 px-2" onclick="detectGPSCoords()" style="font-size: 0.75rem;">
+                            <i class="bi bi-crosshair me-1"></i> Detect My Location
+                        </button>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small" style="font-size: 0.75rem;">Latitude (GPS)</label>
+                            <input type="number" step="0.000001" id="spaceLat" name="latitude" class="form-control" placeholder="12.9716" value="{{ space.latitude if space else '12.971600' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-muted small" style="font-size: 0.75rem;">Longitude (GPS)</label>
+                            <input type="number" step="0.000001" id="spaceLng" name="longitude" class="form-control" placeholder="77.5946" value="{{ space.longitude if space else '77.594600' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Parking Type</label>
+                            <select name="parking_type" class="form-select">
+                                <option value="Private Driveway" {% if space and space.parking_type == 'Private Driveway' %}selected{% endif %}>Private Driveway</option>
+                                <option value="Covered Garage" {% if space and space.parking_type == 'Covered Garage' %}selected{% endif %}>Covered Garage</option>
+                                <option value="Residential" {% if space and space.parking_type == 'Residential' %}selected{% endif %}>Residential Compound</option>
+                                <option value="Open Lot" {% if space and space.parking_type == 'Open Lot' %}selected{% endif %}>Open Gated Lot</option>
+                                <option value="Commercial" {% if space and space.parking_type == 'Commercial' %}selected{% endif %}>Commercial Facility</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Total Slot Capacity</label>
+                            <input type="number" min="1" name="total_slots" class="form-control" value="{{ space.total_slots if space else 1 }}" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Price per Hour (₹)</label>
+                            <input type="number" step="0.50" min="5" name="price_per_hour" class="form-control" placeholder="30.00" value="{{ space.price_per_hour if space else '30.00' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Price per Day (Optional ₹)</label>
+                            <input type="number" step="1.00" min="50" name="price_per_day" class="form-control" placeholder="250.00" value="{{ space.price_per_day if space and space.price_per_day else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Direct Owner Payment Configuration -->
+                    <div class="card p-3 border-success-subtle bg-success-subtle bg-opacity-10 mb-3 rounded-3">
+                        <h6 class="fw-bold text-success mb-2 d-flex align-items-center gap-2">
+                            <i class="bi bi-wallet2"></i> Owner Direct UPI Payment Settings
+                        </h6>
+                        <p class="text-muted small mb-3">
+                            Enter your personal UPI ID so driver payments go directly to your PhonePe, Google Pay, or Paytm account.
+                        </p>
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Your UPI ID (VPA)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-qr-code text-success"></i></span>
+                                    <input type="text" name="upi_id" class="form-control" placeholder="e.g. mobile@ybl or name@okhdfcbank" value="{{ space.upi_id if space and space.upi_id else (current_user.upi_id if current_user and current_user.upi_id else '') }}">
+                                </div>
+                                <small class="text-muted" style="font-size: 0.72rem;">Drivers will pay directly to this UPI address.</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-semibold small">Upload Personal UPI QR Code (Optional)</label>
+                                <input type="file" name="upi_qr_image" class="form-control" accept="image/*">
+                                <small class="text-muted" style="font-size: 0.72rem;">
+                                    {% if space and space.upi_qr_image %}
+                                        Current: <a href="{{ url_for('static', filename='uploads/' ~ space.upi_qr_image) }}" target="_blank" class="text-success fw-bold">View Saved QR</a>
+                                    {% else %}
+                                        Screenshot of your PhonePe / GPay QR code.
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Operating Start Time</label>
+                            <input type="time" name="operating_start" class="form-control" value="{{ space.operating_start.strftime('%H:%M') if space else '06:00' }}" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Operating End Time</label>
+                            <input type="time" name="operating_end" class="form-control" value="{{ space.operating_end.strftime('%H:%M') if space else '22:00' }}" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small d-block mb-1">Supported Vehicle Types</label>
+                        <div class="d-flex flex-wrap gap-3 p-2 bg-light rounded border">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="vehicle_types" value="Car" id="vt_car" {% if not space or 'Car' in (space.vehicle_types or '') %}checked{% endif %}>
+                                <label class="form-check-label small" for="vt_car"><i class="bi bi-car-front me-1"></i>Car</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="vehicle_types" value="Two Wheeler" id="vt_bike" {% if not space or 'Two Wheeler' in (space.vehicle_types or '') %}checked{% endif %}>
+                                <label class="form-check-label small" for="vt_bike"><i class="bi bi-bicycle me-1"></i>Two Wheeler / Bike</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="vehicle_types" value="SUV" id="vt_suv" {% if space and 'SUV' in (space.vehicle_types or '') %}checked{% endif %}>
+                                <label class="form-check-label small" for="vt_suv"><i class="bi bi-truck me-1"></i>SUV / Large Vehicle</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="vehicle_types" value="EV" id="vt_ev" {% if space and 'EV' in (space.vehicle_types or '') %}checked{% endif %}>
+                                <label class="form-check-label small" for="vt_ev"><i class="bi bi-lightning-charge me-1"></i>EV (Electric Vehicle)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small d-block mb-1">Available Days</label>
+                        <div class="d-flex flex-wrap gap-2 p-2 bg-light rounded border">
+                            {% set days = [('Mon', 'Mon'), ('Tue', 'Tue'), ('Wed', 'Wed'), ('Thu', 'Thu'), ('Fri', 'Fri'), ('Sat', 'Sat'), ('Sun', 'Sun')] %}
+                            {% for code, label in days %}
+                            <div class="form-check form-check-inline m-0 me-2">
+                                <input class="form-check-input" type="checkbox" name="available_days" value="{{ code }}" id="day_{{ code }}" {% if not space or code in (space.available_days or '') %}checked{% endif %}>
+                                <label class="form-check-label small" for="day_{{ code }}">{{ label }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small d-block mb-1">Amenities & Features</label>
+                        <div class="d-flex flex-wrap gap-3 p-2 bg-light rounded border">
+                            {% set am_list = [('CCTV', 'bi-camera-video', 'CCTV Surveillance'), ('Security', 'bi-shield-check', 'Security Guard'), ('Well Lit', 'bi-lightbulb', 'Well Lit Area'), ('Covered', 'bi-umbrella', 'Covered Parking'), ('EV Charger', 'bi-ev-station', 'EV Charging Point'), ('Gated', 'bi-lock', 'Gated / Secure Entry')] %}
+                            {% for val, icon, text in am_list %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="amenities" value="{{ val }}" id="am_{{ loop.index }}" {% if space %}{% if val in (space.amenities or '') %}checked{% endif %}{% else %}{% if val in ['CCTV', 'Well Lit', 'Security'] %}checked{% endif %}{% endif %}>
+                                <label class="form-check-label small" for="am_{{ loop.index }}"><i class="bi {{ icon }} me-1"></i>{{ text }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Description</label>
+                        <textarea name="description" class="form-control" rows="3" placeholder="Describe accessibility, security, gate instructions..." required>{{ space.description if space else '' }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Parking Rules</label>
+                        <textarea name="rules" class="form-control" rows="2" placeholder="e.g. Please reverse park. Honking prohibited inside compound.">{{ space.rules if space else '' }}</textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold small">Space Image Photo</label>
+                        <input type="file" name="image" class="form-control">
+                        <small class="text-muted" style="font-size: 0.75rem;">Upload a photo of your driveway or garage.</small>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success flex-grow-1 py-2 rounded-pill fw-bold">
+                            <i class="bi bi-check-circle me-1"></i> Save Parking Space
+                        </button>
+                        <a href="{{ url_for('owner.manage_spaces') }}" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function detectGPSCoords() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                document.getElementById('spaceLat').value = pos.coords.latitude.toFixed(6);
+                document.getElementById('spaceLng').value = pos.coords.longitude.toFixed(6);
+            },
+            (err) => {
+                alert("Please allow location access in your browser or enter coordinates manually.");
+            },
+            { enableHighAccuracy: true, timeout: 8000 }
+        );
+    } else {
+        alert("Geolocation is not supported by your browser.");
+    }
+}
+</script>
+{% endblock %}

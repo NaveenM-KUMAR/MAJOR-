@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.sqlite
+*.sqlite3
+*.db
+.env
+.venv
+env/
+venv/
+instance/
+.idea/
+.vscode/
+app/static/uploads/*
+!app/static/uploads/.gitkeep
+!app/static/uploads/default_parking.jpg

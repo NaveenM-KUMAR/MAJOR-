@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Emergency Parking Mode — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-lg-4 py-4">
+    <!-- Emergency Priority Header -->
+    <div class="emergency-banner p-4 p-md-4 mb-4 position-relative rounded-4 shadow-sm" style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%); color: white;">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-inline-flex align-items-center gap-2 bg-white text-danger fw-extrabold px-3 py-1 rounded-pill small mb-2 shadow-sm">
+                    <i class="bi bi-lightning-charge-fill"></i> EMERGENCY PARKING PRIORITY MODE
+                </div>
+                <h1 class="h3 fw-extrabold mb-1">Need Urgent Nearby Parking?</h1>
+                <p class="small mb-0 text-white-50">
+                    Live GPS radar enabled. Closest verified bays prioritized with in-app turn-by-turn road navigation.
+                </p>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <button type="button" id="detectLocationBtn" class="btn btn-light text-danger fw-bold rounded-pill px-4 shadow-sm">
+                    <i class="bi bi-crosshair me-1"></i> Refresh My GPS
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid: Leaflet Google-Maps-Like Navigation & Parking Listings -->
+    <div class="row g-4">
+        <!-- Leaflet Interactive Navigation Map (Left Column) -->
+        <div class="col-lg-7 col-xl-8">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger p-2 rounded-circle">
+                            <i class="bi bi-geo-alt-fill text-white"></i>
+                        </span>
+                        <div>
+                            <h6 class="fw-bold mb-0 text-dark">Live GPS Radar & Road Navigation Map</h6>
+                            <small class="text-muted">Click any parking pin or "Navigate" to draw driving route natively in Leaflet</small>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-danger-subtle text-danger border border-danger px-2 py-1 rounded-pill small">
+                            <i class="bi bi-record-circle-fill text-danger me-1"></i>Live Routing Active
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Map Canvas Container -->
+                <div class="position-relative">
+                    <div id="emergencyMap" style="height: 540px; width: 100%; z-index: 1;" class="bg-light"></div>
+                </div>
+
+                <div class="card-footer bg-light py-2 px-3 border-top small text-muted d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <span>
+                        <i class="bi bi-info-circle text-primary me-1"></i>
+                        <strong>In-App Road Guidance:</strong> Road routing is computed natively via OSRM. No external app redirects.
+                    </span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 rounded-pill" onclick="clearActiveRoute()">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset Route
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Closest Emergency Parking Cards (Right Column) -->
+        <div class="col-lg-5 col-xl-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+                    <i class="bi bi-lightning-fill text-danger"></i> Closest Verified Spots
+                </h5>
+                <span class="badge bg-danger rounded-pill px-3 py-1">
+                    {{ spaces|length }} nearby
+                </span>
+            </div>
+
+            <div class="d-flex flex-column gap-3" style="max-height: 590px; overflow-y: auto; padding-right: 4px;">
+                {% if spaces %}
+                    {% for space in spaces %}
+                        {% set pred = predictions.get(space.id) %}
+                        <div class="card border-2 border-danger shadow-sm rounded-4 card-hover" id="space-card-{{ space.id }}">
+                            <div class="card-body p-3 d-flex flex-column">
+                                <div class="d-flex justify-content-between align-items-start mb-1">
+                                    <h6 class="fw-bold mb-0 text-dark" style="cursor: pointer;" onclick="focusEmergencyMarker({{ space.id }})">
+                                        {{ space.title }}
+                                    </h6>
+                                    <span class="badge bg-danger fw-bold fs-6">
+                                        {{ space.distance_km }} km
+                                    </span>
+                                </div>
+
+                                <p class="text-muted small mb-2">
+                                    <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ space.address }}, {{ space.locality }}
+                                </p>
+
+                                <div class="p-2 bg-light rounded-3 border mb-2">
+                                    <div class="d-flex justify-content-between align-items-center small">
+                                        <span>Rate: <strong class="text-dark">{{ space.price_per_hour|currency }}/hr</strong></span>
+                                        <span>Slots: <strong class="text-success">{{ space.total_slots }} available</strong></span>
+                                    </div>
+                                </div>
+
+                                <!-- ML Availability Forecast -->
+                                {% if pred %}
+                                    <div class="mb-3">
+                                        <span class="badge bg-{{ pred.badge_class }}-subtle text-{{ pred.badge_class }} border border-{{ pred.badge_class }} px-2 py-1 rounded-pill small" style="font-size: 0.72rem;">
+                                            <i class="bi bi-cpu me-1"></i>{{ pred.category }}
+                                        </span>
+                                        <small class="d-block text-muted mt-1" style="font-size: 0.73rem;">{{ pred.explanation }}</small>
+                                    </div>
+                                {% endif %}
+
+                                <!-- In-App Navigation Actions -->
+                                <div class="mt-auto d-flex flex-column gap-2 pt-2 border-top">
+                                    <button type="button" onclick="navigateOnEmergencyMap({{ space.latitude }}, {{ space.longitude }}, '{{ space.title|replace("'", "\\'") }}', {{ space.id }})" class="btn btn-outline-danger py-2 rounded-pill fw-bold">
+                                        <i class="bi bi-sign-turn-right-fill me-1"></i> Navigate on Map
+                                    </button>
+                                    <a href="{{ url_for('driver.book', space_id=space.id, emergency=1) }}" class="btn btn-danger py-2 rounded-pill fw-bold shadow-sm">
+                                        <i class="bi bi-lightning-charge-fill me-1"></i> Fast-Track Reserve
+                                    </a>
+                                    <a href="https://www.google.com/maps/dir/?api=1&destination={{ space.latitude }},{{ space.longitude }}" target="_blank" rel="noopener" class="text-muted text-center small text-decoration-none py-1" style="font-size: 0.75rem;">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i> Optional: Open External Google Maps
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="card border-0 shadow-sm p-4 text-center text-muted rounded-4">
+                        <i class="bi bi-exclamation-circle fs-1 text-danger mb-2"></i>
+                        <h6 class="fw-bold text-dark">No Immediate Spots Within 15 km</h6>
+                        <p class="small mb-3">Try refreshing your GPS location or search all community spaces.</p>
+                        <a href="https://www.google.com/maps/search/parking/@{{ user_lat }},{{ user_lng }},15z" target="_blank" rel="noopener" class="btn btn-danger btn-sm rounded-pill fw-bold mb-2">
+                            <i class="bi bi-geo-alt-fill me-1"></i> Search Nearby on Google Maps
+                        </a>
+                        <a href="{{ url_for('driver.search') }}" class="btn btn-outline-secondary btn-sm rounded-pill">
+                            <i class="bi bi-search me-1"></i> Browse All Localities
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/maps.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const spacesData = {{ spaces_json|tojson|safe if spaces_json is defined else '[]' }};
+        const userLat = {{ user_lat|default(12.9716) }};
+        const userLng = {{ user_lng|default(77.5946) }};
+
+        // Initialize Leaflet map with GPS radar and custom parking pins
+        initEmergencyMap('emergencyMap', spacesData, userLat, userLng);
+
+        // Auto-navigate to closest spot if available
+        if (spacesData && spacesData.length > 0) {
+            const first = spacesData[0];
+            // Plot initial road route to closest spot on load
+            setTimeout(() => {
+                navigateOnEmergencyMap(first.latitude, first.longitude, first.title, first.id);
+            }, 600);
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,658 @@
+{% extends "base.html" %}
+
+{% block title %}Scan Space QR — Community Parking System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .scanner-viewport {
+        position: relative;
+        height: 320px;
+        background: #0f172a;
+        border-radius: 1.25rem;
+        overflow: hidden;
+    }
+
+    .scanner-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 200px;
+        height: 200px;
+        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55);
+        border-radius: 16px;
+        pointer-events: none;
+    }
+
+    /* Corner indicators */
+    .scanner-corner {
+        position: absolute;
+        width: 22px;
+        height: 22px;
+        border: 3.5px solid #38bdf8;
+    }
+    .corner-tl { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
+    .corner-tr { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
+    .corner-bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
+    .corner-br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
+
+    /* Moving laser scanning line */
+    .scanner-laser {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #38bdf8, #0ea5e9, #38bdf8, transparent);
+        box-shadow: 0 0 12px #38bdf8, 0 0 4px #0284c7;
+        opacity: 0;
+        animation: laserScan 2s infinite ease-in-out;
+    }
+
+    .scanner-active .scanner-laser {
+        opacity: 1;
+    }
+
+    @keyframes laserScan {
+        0% { top: 6%; }
+        50% { top: 92%; }
+        100% { top: 6%; }
+    }
+
+    /* Success confirmation overlay */
+    .scan-success-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(16, 185, 129, 0.92);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        z-index: 10;
+        transition: opacity 0.3s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm p-4 text-center">
+                
+                <div class="brand-icon d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle p-3 mb-2 mx-auto" style="width: 60px; height: 60px;">
+                    <i class="bi bi-qr-code-scan fs-3"></i>
+                </div>
+                <h4 class="fw-bold mb-1" id="scannerMainTitle">Self-Service Space Scanner</h4>
+                <p class="text-muted small mb-3" id="scannerSubTitle">Point your camera at the wall QR sticker to Check-In or Check-Out</p>
+
+                <!-- Mode Switcher: Entry vs Exit Scanner Tabs -->
+                <div class="d-inline-flex p-1 bg-light rounded-pill border mb-3 mx-auto shadow-sm">
+                    <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold" id="tabEntryMode">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Entry (Check-In)
+                    </button>
+                    <button type="button" class="btn btn-sm rounded-pill px-3 fw-bold" id="tabExitMode">
+                        <i class="bi bi-box-arrow-right me-1"></i> Exit (Check-Out)
+                    </button>
+                </div>
+
+                <!-- Active Stay Banner (if driver has an active parking session) -->
+                {% if active_stay %}
+                    <div class="alert alert-warning border border-warning rounded-4 text-start p-3 mb-3 shadow-sm bg-warning-subtle text-dark" id="activeStayAlert">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <span class="badge bg-warning text-dark fw-bold mb-1">
+                                    <i class="bi bi-clock-history me-1"></i> CURRENTLY PARKED
+                                </span>
+                                <h6 class="fw-bold mb-0 text-dark">{{ active_stay.parking_space.title }} (Bay #{{ active_stay.parking_space_id }})</h6>
+                                <small class="text-muted">Vehicle: {{ active_stay.vehicle_plate }} &bull; Checked in at {{ active_stay.check_in_time.strftime('%I:%M %p') if active_stay.check_in_time else 'Active' }}</small>
+                            </div>
+                            <a href="{{ url_for('driver.space_scan', space_id=active_stay.parking_space_id, auto=1) }}" class="btn btn-dark btn-sm rounded-pill px-3 fw-bold shadow-sm">
+                                <i class="bi bi-box-arrow-right me-1"></i> 1-Click Exit & Check-Out
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Camera Viewport Box -->
+                <div class="scanner-viewport mb-3" id="viewportContainer">
+                    <video id="cameraVideo" autoplay playsinline muted class="w-100 h-100 object-fit-cover"></video>
+                    
+                    <!-- Hidden Canvas for frame analysis -->
+                    <canvas id="scannerCanvas" class="d-none"></canvas>
+
+                    <!-- Viewfinder Overlay Box with Laser Line -->
+                    <div class="scanner-box" id="scannerBox">
+                        <div class="scanner-corner corner-tl"></div>
+                        <div class="scanner-corner corner-tr"></div>
+                        <div class="scanner-corner corner-bl"></div>
+                        <div class="scanner-corner corner-br"></div>
+                        <div class="scanner-laser"></div>
+                    </div>
+
+                    <!-- Live Target Badge -->
+                    <div class="position-absolute bottom-0 start-50 translate-middle-x mb-3 text-center" style="z-index: 5;">
+                        <span id="scanBadge" class="badge bg-dark bg-opacity-75 px-3 py-2 rounded-pill small border border-secondary shadow-sm">
+                            <i class="bi bi-camera me-1"></i> Tap "Activate Camera" to scan
+                        </span>
+                    </div>
+
+                    <!-- Success Animation Overlay (Hidden initially) -->
+                    <div id="successOverlay" class="scan-success-overlay d-none">
+                        <div class="display-3 mb-2"><i class="bi bi-check-circle-fill"></i></div>
+                        <h5 class="fw-bold mb-1" id="successTitle">QR Code Detected!</h5>
+                        <p class="small mb-0 text-white-50" id="successSub">Redirecting to Parking Bay...</p>
+                    </div>
+                </div>
+
+                <!-- Camera Action Controls -->
+                <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap mb-3">
+                    <button id="startCamBtn" class="btn btn-primary rounded-pill px-4 btn-sm fw-semibold shadow-sm">
+                        <i class="bi bi-camera-video-fill me-1"></i> Activate Camera
+                    </button>
+                    <button id="switchCamBtn" class="btn btn-outline-secondary rounded-pill px-3 btn-sm fw-semibold d-none">
+                        <i class="bi bi-arrow-repeat me-1"></i> Switch Camera
+                    </button>
+                    <label class="btn btn-outline-primary rounded-pill px-3 btn-sm fw-semibold mb-0" style="cursor: pointer;">
+                        <i class="bi bi-image me-1"></i> Upload QR Photo
+                        <input type="file" id="qrFileInput" accept="image/*" class="d-none">
+                    </label>
+                </div>
+
+                <!-- Camera Status Message -->
+                <div id="camStatus" class="small text-muted mb-4">
+                    Position the parking bay QR code within the frame to automatically check in or check out.
+                </div>
+
+                <!-- Divider -->
+                <div class="d-flex align-items-center mb-3">
+                    <hr class="flex-grow-1 my-0">
+                    <span class="px-3 text-muted small text-uppercase fw-bold">OR ENTER SPACE NUMBER</span>
+                    <hr class="flex-grow-1 my-0">
+                </div>
+
+                <!-- Manual Space ID Form -->
+                <form method="POST" action="{{ url_for('driver.scanner') }}" id="manualSpaceForm">
+                    <div class="mb-3 text-start">
+                        <label class="form-label fw-semibold small">Space Number (from wall signboard)</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="bi bi-p-square-fill text-primary"></i></span>
+                            <input type="number" id="spaceIdInput" name="space_id" class="form-control form-control-lg" placeholder="e.g. 1" min="1" required>
+                        </div>
+                        <small class="text-muted" style="font-size: 0.75rem;">Look for "Space #X" printed on the physical signboard.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow-sm">
+                        <i class="bi bi-box-arrow-in-right me-1"></i> Open Self-Service Bay
+                    </button>
+                </form>
+
+                <!-- Quick Test / Demo Helper -->
+                <div class="mt-4 p-3 bg-light rounded-3 text-start small border">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold text-dark"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> Demonstration & Quick Testing</span>
+                        <span class="badge bg-secondary-subtle text-secondary">Demo Mode</span>
+                    </div>
+                    <p class="text-muted mb-2" style="font-size: 0.8rem;">
+                        Testing on desktop or viva evaluation without a printed signboard? You can click a demo bay below:
+                    </p>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{{ url_for('driver.space_scan', space_id=1, auto=1) }}" class="btn btn-sm btn-outline-primary rounded-pill">
+                            <i class="bi bi-qr-code me-1"></i> Test Space #1 (Auto Entry/Exit)
+                        </a>
+                        <a href="{{ url_for('driver.space_scan', space_id=2, auto=1) }}" class="btn btn-sm btn-outline-primary rounded-pill">
+                            <i class="bi bi-qr-code me-1"></i> Test Space #2 (Auto Entry/Exit)
+                        </a>
+                        {% if active_stay %}
+                            <a href="{{ url_for('driver.space_scan', space_id=active_stay.parking_space_id, auto=1) }}" class="btn btn-sm btn-warning text-dark rounded-pill fw-bold shadow-sm">
+                                <i class="bi bi-box-arrow-right me-1"></i> Exit & Check-Out (Bay #{{ active_stay.parking_space_id }})
+                            </a>
+                        {% endif %}
+                        <button type="button" class="btn btn-sm btn-outline-dark rounded-pill" data-bs-toggle="modal" data-bs-target="#sampleQrModal">
+                            <i class="bi bi-eye-fill me-1"></i> View Sample QR (Space #1)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sample QR Modal -->
+                <div class="modal fade" id="sampleQrModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <div class="modal-header border-0 pb-0">
+                                <h5 class="modal-title fw-bold">Sample Bay QR Code (Space #1)</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body text-center py-4">
+                                <p class="text-muted small">Point your mobile camera at this QR code or download it to test uploading:</p>
+                                <div class="p-3 bg-white border rounded-3 d-inline-block shadow-sm mb-3">
+                                    <img src="{{ url_for('static', filename='uploads/sample_space1_qr.png') }}" alt="Sample Space 1 QR" style="width: 220px; height: 220px;">
+                                </div>
+                                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                                    <a href="{{ url_for('static', filename='uploads/sample_space1_qr.png') }}" download="sample_space1_qr.png" class="btn btn-sm btn-primary rounded-pill px-3">
+                                        <i class="bi bi-download me-1"></i> Download Sample QR Image
+                                    </a>
+                                    <a href="{{ url_for('static', filename='uploads/sample_space1_qr.png') }}" target="_blank" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i> Open Image in New Tab
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Instructions Accordion / Card -->
+                <div class="mt-3 p-3 bg-light rounded-3 text-start small text-muted border">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-info-circle-fill text-primary me-1"></i> How Self-Check-In Works:</h6>
+                    <ol class="mb-0 ps-3">
+                        <li>Point your phone camera at the wall QR sticker or upload a screenshot.</li>
+                        <li>The system decodes the space reference and checks your booking status.</li>
+                        <li><strong>Arrival:</strong> Confirms check-in and logs entry time.</li>
+                        <li><strong>Departure:</strong> Scans to check out and generates payment receipt.</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include jsQR library locally for reliable offline & cross-browser scanning -->
+<script src="{{ url_for('static', filename='js/jsqr.min.js') }}"></script>
+
+<script>
+(() => {
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('scannerCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const startCamBtn = document.getElementById('startCamBtn');
+    const switchCamBtn = document.getElementById('switchCamBtn');
+    const qrFileInput = document.getElementById('qrFileInput');
+    const camStatus = document.getElementById('camStatus');
+    const scanBadge = document.getElementById('scanBadge');
+    const viewportContainer = document.getElementById('viewportContainer');
+    const successOverlay = document.getElementById('successOverlay');
+    const successTitle = document.getElementById('successTitle');
+    const successSub = document.getElementById('successSub');
+    const spaceIdInput = document.getElementById('spaceIdInput');
+    const manualSpaceForm = document.getElementById('manualSpaceForm');
+
+    let stream = null;
+    let isScanning = false;
+    let currentFacingMode = 'environment';
+    let animationFrameId = null;
+    let barcodeDetector = null;
+
+    // Mode Switcher Elements
+    const tabEntryMode = document.getElementById('tabEntryMode');
+    const tabExitMode = document.getElementById('tabExitMode');
+    const scannerMainTitle = document.getElementById('scannerMainTitle');
+    const scannerSubTitle = document.getElementById('scannerSubTitle');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const savedScannerMode = sessionStorage.getItem('cps_scanner_mode');
+    let isExitMode = false;
+    if (urlParams.get('mode') === 'exit' || (!urlParams.get('mode') && savedScannerMode === 'exit')) {
+        isExitMode = true;
+    } else if (urlParams.get('mode') === 'entry' || (!urlParams.get('mode') && savedScannerMode === 'entry')) {
+        isExitMode = false;
+    } else {
+        isExitMode = {{ 'true' if active_stay else 'false' }};
+    }
+
+    function updateModeUI() {
+        if (isExitMode) {
+            if (tabExitMode) tabExitMode.className = 'btn btn-sm rounded-pill px-3 fw-bold btn-warning text-dark shadow-sm';
+            if (tabEntryMode) tabEntryMode.className = 'btn btn-sm rounded-pill px-3 fw-semibold text-muted';
+            if (scannerMainTitle) scannerMainTitle.innerHTML = '<i class="bi bi-box-arrow-right text-warning me-1"></i> Exit &amp; Check-Out Scanner';
+            if (scannerSubTitle) scannerSubTitle.textContent = "Point your camera at the wall sign QR to confirm departure and release the bay.";
+            if (!isScanning && scanBadge) {
+                scanBadge.innerHTML = '<i class="bi bi-camera me-1"></i> Ready to scan wall sign to Exit';
+            }
+        } else {
+            if (tabEntryMode) tabEntryMode.className = 'btn btn-sm rounded-pill px-3 fw-bold btn-primary text-white shadow-sm';
+            if (tabExitMode) tabExitMode.className = 'btn btn-sm rounded-pill px-3 fw-semibold text-muted';
+            if (scannerMainTitle) scannerMainTitle.innerHTML = '<i class="bi bi-box-arrow-in-right text-primary me-1"></i> Entry &amp; Check-In Scanner';
+            if (scannerSubTitle) scannerSubTitle.textContent = "Point your camera at the wall sign QR to confirm arrival and park.";
+            if (!isScanning && scanBadge) {
+                scanBadge.innerHTML = '<i class="bi bi-camera me-1"></i> Ready to scan wall sign to Enter';
+            }
+        }
+    }
+
+    if (tabEntryMode && tabExitMode) {
+        tabEntryMode.addEventListener('click', () => {
+            isExitMode = false;
+            sessionStorage.setItem('cps_scanner_mode', 'entry');
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('mode', 'entry');
+            window.history.replaceState({}, '', newUrl);
+            updateModeUI();
+        });
+        tabExitMode.addEventListener('click', () => {
+            isExitMode = true;
+            sessionStorage.setItem('cps_scanner_mode', 'exit');
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.set('mode', 'exit');
+            window.history.replaceState({}, '', newUrl);
+            updateModeUI();
+        });
+        updateModeUI();
+    }
+
+    // Initialize native BarcodeDetector if available in modern browsers
+    if ('BarcodeDetector' in window) {
+        try {
+            barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+        } catch (e) {
+            barcodeDetector = null;
+        }
+    }
+
+    // Audio chime synthesis via Web Audio API (no external file dependency)
+    function playBeep() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const audioCtx = new AudioCtx();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.12);
+
+            gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.12);
+        } catch (e) {
+            console.log('Audio feedback unavailable:', e);
+        }
+    }
+
+    // Start Camera Stream
+    async function startCamera(facingMode = 'environment') {
+        stopCamera();
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            camStatus.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>Camera API is not supported on this browser. Please use manual Space ID or file upload.</span>';
+            return;
+        }
+
+        try {
+            camStatus.innerHTML = '<span class="text-primary"><i class="bi bi-hourglass-split me-1"></i>Requesting camera access...</span>';
+            
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: facingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+
+            video.srcObject = stream;
+            await video.play();
+
+            isScanning = true;
+            viewportContainer.classList.add('scanner-active');
+            startCamBtn.innerHTML = '<i class="bi bi-stop-circle-fill me-1"></i> Stop Camera';
+            startCamBtn.classList.remove('btn-primary');
+            startCamBtn.classList.add('btn-outline-danger');
+            switchCamBtn.classList.remove('d-none');
+
+            camStatus.innerHTML = '<span class="text-success"><i class="bi bi-broadcast me-1"></i>Camera live! Align the parking wall QR code inside the box.</span>';
+            scanBadge.innerHTML = '<i class="bi bi-eye-fill me-1"></i> Scanning active...';
+            scanBadge.className = 'badge bg-success bg-opacity-75 px-3 py-2 rounded-pill small border border-success';
+
+            // Start continuous scanning loop
+            requestAnimationFrame(scanLoop);
+
+        } catch (err) {
+            console.error('Camera start error:', err);
+            // If environment camera failed, try default camera
+            if (facingMode === 'environment') {
+                try {
+                    startCamera('user');
+                    return;
+                } catch (fallbackErr) {}
+            }
+            camStatus.innerHTML = '<span class="text-warning"><i class="bi bi-camera-video-off me-1"></i>Camera permission denied or camera in use. Enter Space ID below or upload a QR image.</span>';
+            scanBadge.innerHTML = '<i class="bi bi-exclamation-circle me-1"></i> Camera unavailable';
+        }
+    }
+
+    // Stop Camera Stream
+    function stopCamera() {
+        isScanning = false;
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        viewportContainer.classList.remove('scanner-active');
+        startCamBtn.innerHTML = '<i class="bi bi-camera-video-fill me-1"></i> Activate Camera';
+        startCamBtn.classList.remove('btn-outline-danger');
+        startCamBtn.classList.add('btn-primary');
+    }
+
+    // Continuous Frame Scanning Loop
+    async function scanLoop() {
+        if (!isScanning) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const vWidth = video.videoWidth;
+            const vHeight = video.videoHeight;
+
+            if (vWidth > 0 && vHeight > 0) {
+                canvas.width = vWidth;
+                canvas.height = vHeight;
+                ctx.drawImage(video, 0, 0, vWidth, vHeight);
+
+                let detectedData = null;
+
+                // 1. Try Native BarcodeDetector
+                if (barcodeDetector) {
+                    try {
+                        const barcodes = await barcodeDetector.detect(canvas);
+                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                            detectedData = barcodes[0].rawValue;
+                        }
+                    } catch (e) {
+                        // Fallback to jsQR below
+                    }
+                }
+
+                // 2. Fallback to jsQR
+                if (!detectedData && window.jsQR) {
+                    try {
+                        const imgData = ctx.getImageData(0, 0, vWidth, vHeight);
+                        const code = jsQR(imgData.data, imgData.width, imgData.height, {
+                            inversionAttempts: "dontInvert"
+                        });
+                        if (code && code.data) {
+                            detectedData = code.data;
+                        }
+                    } catch (e) {
+                        console.error("jsQR scan error:", e);
+                    }
+                }
+
+                if (detectedData) {
+                    handleSuccessfulScan(detectedData);
+                    return; // Stop loop once detected
+                }
+            }
+        }
+
+        animationFrameId = requestAnimationFrame(scanLoop);
+    }
+
+    // Parse and Process Scanned Content
+    function handleSuccessfulScan(rawText) {
+        if (!rawText) return;
+        const text = rawText.trim();
+        console.log("[*] QR Code Decoded:", text);
+
+        playBeep();
+        stopCamera();
+
+        // Show Success Overlay Animation
+        successOverlay.classList.remove('d-none');
+
+        // Pattern 1: URL containing space-scan route (e.g. /driver/space-scan/1 or http://.../driver/space-scan/1)
+        const spaceScanUrlMatch = text.match(/\/driver\/space-scan\/(\d+)/i);
+        if (spaceScanUrlMatch) {
+            const spaceId = spaceScanUrlMatch[1];
+            successTitle.textContent = `Space #${spaceId} Recognized!`;
+            successSub.textContent = "Processing entry/exit verification...";
+            setTimeout(() => {
+                window.location.href = `/driver/space-scan/${spaceId}?auto=1`;
+            }, 700);
+            return;
+        }
+
+        // Pattern 2: Direct Number (e.g. "1" or "42")
+        if (/^\d+$/.test(text)) {
+            const spaceId = parseInt(text, 10);
+            successTitle.textContent = `Space #${spaceId} Identified!`;
+            successSub.textContent = "Processing entry/exit verification...";
+            setTimeout(() => {
+                window.location.href = `/driver/space-scan/${spaceId}?auto=1`;
+            }, 700);
+            return;
+        }
+
+        // Pattern 3: Text with Space or Bay number (e.g. "Space #1", "BAY 2", "SPACE_1", "space_id=3")
+        const labelMatch = text.match(/(?:space|bay|slot|id)[\s_#:=]*(\d+)/i);
+        if (labelMatch) {
+            const spaceId = labelMatch[1];
+            successTitle.textContent = `Space #${spaceId} Found!`;
+            successSub.textContent = "Processing entry/exit verification...";
+            setTimeout(() => {
+                window.location.href = `/driver/space-scan/${spaceId}?auto=1`;
+            }, 700);
+            return;
+        }
+
+        // Pattern 4: Booking QR Token (e.g. "CPS-QR-..." or "CPS-BKG-...")
+        if (text.startsWith('CPS-QR-') || text.startsWith('CPS-BKG-')) {
+            successTitle.textContent = "Booking Pass Detected!";
+            successSub.textContent = "Token reference: " + text;
+            setTimeout(() => {
+                // Auto-fill and submit or alert
+                alert(`Booking Pass Token Detected:\n${text}\n\nIf you are checking in at a host gate, the host scans this code, or enter your space number below.`);
+                successOverlay.classList.add('d-none');
+            }, 600);
+            return;
+        }
+
+        // Pattern 5: Relative or Full URL on this host
+        if (text.startsWith('/') || text.includes(window.location.host)) {
+            successTitle.textContent = "Portal Link Detected!";
+            successSub.textContent = "Redirecting...";
+            setTimeout(() => {
+                window.location.href = text;
+            }, 700);
+            return;
+        }
+
+        // Fallback: If it's another string, populate Space ID field if digits found
+        const digitMatch = text.match(/\d+/);
+        if (digitMatch) {
+            spaceIdInput.value = digitMatch[0];
+            successTitle.textContent = `Identified Space #${digitMatch[0]}`;
+            successSub.textContent = "Submitting bay reference...";
+            setTimeout(() => {
+                manualSpaceForm.submit();
+            }, 700);
+            return;
+        }
+
+        // If unknown format, show message
+        successOverlay.classList.add('d-none');
+        alert(`Scanned QR Code: "${text}"\nCould not extract a valid Space Number from this QR code. Please verify the signboard or enter the Space # manually.`);
+    }
+
+    // Upload & Scan Image File
+    qrFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+
+        camStatus.innerHTML = '<span class="text-primary"><i class="bi bi-hourglass-split me-1"></i>Analyzing uploaded image for QR code...</span>';
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = async () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+
+                let decoded = null;
+
+                // Try native detector
+                if (barcodeDetector) {
+                    try {
+                        const barcodes = await barcodeDetector.detect(canvas);
+                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                            decoded = barcodes[0].rawValue;
+                        }
+                    } catch (err) {}
+                }
+
+                // Try jsQR
+                if (!decoded && window.jsQR) {
+                    try {
+                        const imgData = ctx.getImageData(0, 0, img.width, img.height);
+                        const code = jsQR(imgData.data, imgData.width, imgData.height, {
+                            inversionAttempts: "attemptBoth"
+                        });
+                        if (code && code.data) {
+                            decoded = code.data;
+                        }
+                    } catch (err) {}
+                }
+
+                if (decoded) {
+                    camStatus.innerHTML = '<span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>QR Code successfully detected from uploaded image!</span>';
+                    handleSuccessfulScan(decoded);
+                } else {
+                    camStatus.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>No valid QR code found in that image. Please try another photo or enter Space ID manually.</span>';
+                }
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // Start / Stop Toggle Button
+    startCamBtn.addEventListener('click', () => {
+        if (isScanning) {
+            stopCamera();
+            camStatus.textContent = 'Camera paused. Tap "Activate Camera" to resume scanning.';
+            scanBadge.innerHTML = '<i class="bi bi-camera me-1"></i> Camera paused';
+            scanBadge.className = 'badge bg-dark bg-opacity-75 px-3 py-2 rounded-pill small border border-secondary shadow-sm';
+        } else {
+            startCamera(currentFacingMode);
+        }
+    });
+
+    // Switch Camera Button (Front / Rear)
+    switchCamBtn.addEventListener('click', () => {
+        currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+        startCamera(currentFacingMode);
+    });
+
+    // Clean up on page exit
+    window.addEventListener('beforeunload', () => {
+        stopCamera();
+    });
+})();
+</script>
+{% endblock %}

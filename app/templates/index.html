@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Community Parking System — Find & Share Parking{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-gradient">
+    <div class="container">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-7">
+                <div class="badge bg-primary-subtle text-primary border border-primary px-3 py-2 rounded-pill mb-3">
+                    <i class="bi bi-shield-check me-1"></i> Community-Driven Smart Parking Platform
+                </div>
+                <h1 class="display-4 fw-extrabold text-white mb-3">
+                    Find parking. <br>Book easily. <br><span class="text-primary">Park smarter.</span>
+                </h1>
+                <p class="lead text-white-50 mb-4">
+                    Transforming underutilized residential driveways and private community spaces into guaranteed, affordable parking for urban drivers.
+                </p>
+
+                <!-- Quick Action Buttons -->
+                <div class="d-flex flex-wrap gap-3 mb-4">
+                    <a href="{{ url_for('driver.search') }}" class="btn btn-primary btn-lg px-4 rounded-pill fw-bold shadow">
+                        <i class="bi bi-search me-2"></i> Find Nearby Parking
+                    </a>
+                    <a href="{{ url_for('driver.emergency') }}" class="btn btn-danger btn-lg px-4 rounded-pill fw-bold shadow pulse-icon">
+                        <i class="bi bi-lightning-charge-fill me-2"></i> Emergency Mode
+                    </a>
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-outline-light btn-lg px-4 rounded-pill fw-semibold">
+                        <i class="bi bi-houses-fill me-2"></i> List Your Space
+                    </a>
+                </div>
+            </div>
+
+            <!-- Interactive Quick Search Card -->
+            <div class="col-lg-5">
+                <div class="hero-search-card p-4 text-dark">
+                    <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                        <i class="bi bi-geo-alt-fill text-primary"></i> Quick Parking Search
+                    </h5>
+                    <form action="{{ url_for('driver.search') }}" method="GET">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Destination / Locality</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white"><i class="bi bi-pin-map text-muted"></i></span>
+                                <input type="text" name="locality" class="form-control" placeholder="e.g. Koramangala, Indiranagar" required>
+                            </div>
+                        </div>
+
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Vehicle Type</label>
+                                <select name="vehicle_type" class="form-select">
+                                    <option value="">All Vehicles</option>
+                                    <option value="Car">Car / 4-Wheeler</option>
+                                    <option value="Two Wheeler">Two Wheeler / Bike</option>
+                                    <option value="SUV">SUV</option>
+                                    <option value="EV">EV Charging Slot</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small fw-semibold">Parking Type</label>
+                                <select name="parking_type" class="form-select">
+                                    <option value="">Any Type</option>
+                                    <option value="Private Driveway">Driveway</option>
+                                    <option value="Covered Garage">Covered Garage</option>
+                                    <option value="Residential">Residential</option>
+                                    <option value="Commercial">Commercial</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 py-2 rounded-3 fw-bold">
+                            <i class="bi bi-search me-1"></i> Search Available Slots
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Value Pillars / Objectives -->
+<section class="py-5 bg-white">
+    <div class="container">
+        <div class="text-center max-w-700 mx-auto mb-5">
+            <h6 class="text-primary fw-bold text-uppercase">Why Community Parking?</h6>
+            <h2 class="fw-bold">Solving Urban Congestion Together</h2>
+            <p class="text-muted">Over 30% of downtown traffic is caused by drivers searching for open parking. Our community sharing network fixes that.</p>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card h-100 p-4 border-0 shadow-sm bg-light">
+                    <div class="fs-1 text-primary mb-3"><i class="bi bi-cpu-fill"></i></div>
+                    <h5 class="fw-bold">Smart Availability Prediction</h5>
+                    <p class="text-muted small">
+                        Our explainable statistical demand engine analyzes hourly patterns and local booking densities to predict slot availability before you arrive.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 p-4 border-0 shadow-sm bg-light">
+                    <div class="fs-1 text-danger mb-3"><i class="bi bi-lightning-charge-fill"></i></div>
+                    <h5 class="fw-bold">Emergency Parking Mode</h5>
+                    <p class="text-muted small">
+                        In urgent need? 1-click discovery immediately routes you to the closest verified open slots with instant navigation.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100 p-4 border-0 shadow-sm bg-light">
+                    <div class="fs-1 text-success mb-3"><i class="bi bi-qr-code-scan"></i></div>
+                    <h5 class="fw-bold">Self-Service Wall QR Check-In</h5>
+                    <p class="text-muted small">
+                        Autonomous digital entry and exit. Simply scan the parking space's wall-mounted QR signboard with your smartphone camera to check in and out in seconds.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Community Parking Spaces -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-end mb-4">
+            <div>
+                <h6 class="text-primary fw-bold text-uppercase mb-1">Explore Listings</h6>
+                <h3 class="fw-bold mb-0">Verified Community Spaces</h3>
+            </div>
+            <a href="{{ url_for('driver.search') }}" class="btn btn-outline-primary rounded-pill fw-semibold btn-sm">
+                View All Spaces <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
+
+        <div class="row g-4">
+            {% if featured_spaces %}
+                {% for space in featured_spaces %}
+                    <div class="col-md-4">
+                        <div class="card h-100 card-hover overflow-hidden border-0 shadow-sm">
+                            <div class="position-relative" style="height: 180px; background-color: #e2e8f0;">
+                                <img src="{{ url_for('static', filename='uploads/' + space.image_url) }}" 
+                                     onerror="this.src='https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=600&auto=format&fit=crop&q=80'"
+                                     class="w-100 h-100 object-fit-cover" alt="{{ space.title }}">
+                                <span class="position-absolute top-0 end-0 m-3 badge bg-slate px-3 py-2 rounded-pill shadow-sm">
+                                    {{ space.price_per_hour|currency }}/hr
+                                </span>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="fw-bold mb-0 text-dark">{{ space.title }}</h5>
+                                    <span class="badge bg-light text-dark border">
+                                        <i class="bi bi-star-fill text-warning me-1"></i>{{ space.average_rating }}
+                                    </span>
+                                </div>
+                                <p class="text-muted small mb-3">
+                                    <i class="bi bi-geo-alt me-1 text-primary"></i>{{ space.locality }}, {{ space.city }}
+                                </p>
+                                <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                    <span class="badge bg-primary-subtle text-primary">{{ space.parking_type }}</span>
+                                    <a href="{{ url_for('driver.details', space_id=space.id) }}" class="btn btn-sm btn-primary rounded-pill px-3">
+                                        View & Book
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12 text-center py-5 text-muted">
+                    <p>No parking listings available yet. Register as an Owner to add the first space!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Owner Monetization CTA -->
+<section class="py-5 bg-dark-slate text-white">
+    <div class="container">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-8">
+                <h2 class="display-6 fw-bold mb-3">Have an Empty Driveway or Garage?</h2>
+                <p class="lead text-white-50 mb-4">
+                    Earn passive monthly income by sharing your unused parking space with verified neighborhood drivers. Full control over operating hours and slot pricing.
+                </p>
+                <div class="d-flex gap-3">
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-success btn-lg rounded-pill px-4 fw-bold">
+                        <i class="bi bi-cash-coin me-2"></i> Start Earning as an Owner
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-4 text-center">
+                <div class="card bg-slate p-4 border border-secondary text-white">
+                    <h5 class="text-warning fw-bold mb-2">Estimated Earnings</h5>
+                    <div class="display-5 fw-extrabold text-white mb-2">₹4,000 – ₹12,000</div>
+                    <small class="text-white-50">Per month for 1 driveway slot</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

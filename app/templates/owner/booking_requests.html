@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Booking Requests — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h3 class="fw-bold mb-1">Booking Management</h3>
+    <p class="text-muted small mb-4">Review, approve, or reject reservation requests for your listed spaces</p>
+
+    <!-- Pending Requests -->
+    <h5 class="fw-bold mb-3 text-warning"><i class="bi bi-hourglass-split me-1"></i> Pending Approval ({{ pending_bookings|length }})</h5>
+    {% if pending_bookings %}
+        <div class="row g-3 mb-5">
+            {% for b in pending_bookings %}
+                <div class="col-md-6">
+                    <div class="card border-warning border-2 shadow-sm p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="fw-bold text-dark mb-0">{{ b.driver.name }}</h5>
+                            <span class="badge bg-warning text-dark">PENDING APPROVAL</span>
+                        </div>
+                        <p class="text-muted small mb-2"><i class="bi bi-buildings me-1"></i>{{ b.parking_space.title }}</p>
+                        
+                        <div class="p-3 bg-light rounded-3 border mb-3 small">
+                            <div><strong>Date:</strong> {{ b.booking_date.strftime('%b %d, %Y') }}</div>
+                            <div><strong>Time Slot:</strong> {{ b.start_time.strftime('%H:%M') }} – {{ b.end_time.strftime('%H:%M') }} ({{ b.duration_hours }} hrs)</div>
+                            <div><strong>Vehicle:</strong> {{ b.vehicle_plate }} ({{ b.vehicle_type }})</div>
+                            <div><strong>Driver Phone:</strong> {{ b.driver.phone }}</div>
+                            <div><strong>Estimated Fee:</strong> <span class="text-primary fw-bold">{{ b.total_price|currency }}</span></div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <form action="{{ url_for('owner.approve_booking', booking_id=b.id) }}" method="POST" class="flex-grow-1">
+                                <button type="submit" class="btn btn-success w-100 rounded-pill fw-bold">
+                                    <i class="bi bi-check-circle me-1"></i> Approve
+                                </button>
+                            </form>
+                            <form action="{{ url_for('owner.reject_booking', booking_id=b.id) }}" method="POST" class="flex-grow-1">
+                                <button type="submit" class="btn btn-outline-danger w-100 rounded-pill">
+                                    <i class="bi bi-x-circle me-1"></i> Reject
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card border-0 shadow-sm p-4 text-center text-muted mb-5">
+            <p class="mb-0 small">No pending booking requests.</p>
+        </div>
+    {% endif %}
+
+    <!-- Approved / Ready for Arrival -->
+    <h5 class="fw-bold mb-3 text-primary"><i class="bi bi-check2-all me-1"></i> Approved & Active Stays</h5>
+    {% if approved_bookings or active_bookings %}
+        <div class="row g-3 mb-5">
+            {% for b in active_bookings %}
+                <div class="col-md-6">
+                    <div class="card border-primary shadow-sm p-4 bg-light">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="fw-bold text-dark mb-0">{{ b.driver.name }} ({{ b.vehicle_plate }})</h5>
+                            <span class="badge bg-primary">PARKED (ACTIVE)</span>
+                        </div>
+                        <p class="text-muted small mb-2">{{ b.parking_space.title }}</p>
+                        <div class="small text-muted">
+                            Check-in verified: {{ b.check_in_time.strftime('%I:%M %p, %b %d') if b.check_in_time else 'Active' }}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+
+            {% for b in approved_bookings %}
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="fw-bold text-dark mb-0">{{ b.driver.name }} ({{ b.vehicle_plate }})</h5>
+                            <span class="badge bg-success">APPROVED (AWAITING CHECK-IN)</span>
+                        </div>
+                        <p class="text-muted small mb-2">{{ b.parking_space.title }}</p>
+                        <div class="small text-muted mb-2">
+                            <i class="bi bi-clock me-1"></i>Scheduled: {{ b.booking_date.strftime('%b %d') }} ({{ b.start_time.strftime('%H:%M') }} - {{ b.end_time.strftime('%H:%M') }})
+                        </div>
+                        <div class="p-2 bg-warning-subtle text-warning-emphasis rounded-3 border border-warning-subtle small mb-3">
+                            <i class="bi bi-hourglass-split me-1"></i><strong>30-Min Grace Period:</strong> Bay auto-releases if driver does not check in within 30 mins of start time.
+                        </div>
+                        <form action="{{ url_for('owner.release_no_show', booking_id=b.id) }}" method="POST" onsubmit="return confirm('Release this bay for other drivers due to no-show? This cancels the reservation and opens the bay immediately.');">
+                            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill fw-semibold">
+                                <i class="bi bi-box-arrow-up-right me-1"></i> Release Bay (Driver No-Show)
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="card border-0 shadow-sm p-4 text-center text-muted mb-5">
+            <p class="mb-0 small">No currently approved or active sessions.</p>
+        </div>
+    {% endif %}
+
+    <!-- History Tab -->
+    <h5 class="fw-bold mb-3 text-secondary"><i class="bi bi-clock-history me-1"></i> Completed & Past Bookings</h5>
+    {% if history_bookings %}
+        <div class="card border-0 shadow-sm overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Driver</th>
+                            <th>Space</th>
+                            <th>Date</th>
+                            <th>Vehicle</th>
+                            <th>Revenue</th>
+                            <th>Status / Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for b in history_bookings %}
+                            <tr>
+                                <td class="fw-bold font-monospace small">{{ b.booking_reference }}</td>
+                                <td>{{ b.driver.name }}</td>
+                                <td>{{ b.parking_space.title }}</td>
+                                <td>{{ b.booking_date.strftime('%b %d, %Y') }}</td>
+                                <td>{{ b.vehicle_plate }}</td>
+                                <td class="text-success fw-bold">{{ b.total_price|currency }}</td>
+                                <td>
+                                    <span class="badge {{ b.status|badge_status }}">{{ b.status }}</span>
+                                    {% if b.cancellation_reason %}
+                                        <div class="text-muted small mt-1" style="font-size: 0.75rem;">
+                                            <i class="bi bi-info-circle me-1"></i>{{ b.cancellation_reason }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

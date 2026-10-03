@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Owner Dashboard — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
+        <div>
+            <h2 class="fw-bold mb-1">Owner Command Center</h2>
+            <p class="text-muted mb-0">Manage parking listings, approve requests, and generate wall QR signboards.</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ url_for('owner.manage_spaces') }}" class="btn btn-outline-dark rounded-pill px-3 fw-bold">
+                <i class="bi bi-qr-code me-1"></i> Wall Signboards
+            </a>
+            <a href="{{ url_for('owner.scanner') }}" class="btn btn-outline-secondary rounded-pill px-3 fw-semibold" title="Optional: For gated security guards to manually verify driver passes">
+                <i class="bi bi-shield-check me-1"></i> Gatekeeper Check
+            </a>
+            <a href="{{ url_for('owner.add_space') }}" class="btn btn-success rounded-pill px-3 fw-bold shadow-sm">
+                <i class="bi bi-plus-circle me-1"></i> Add Parking Space
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card kpi-success">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Total Revenue</small>
+                <div class="fs-4 fw-extrabold text-success">{{ analytics.total_revenue|currency }}</div>
+                <small class="text-muted">{{ analytics.completed_bookings }} completed stays</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Pending Requests</small>
+                <div class="fs-4 fw-extrabold text-warning">{{ pending_bookings|length }}</div>
+                <small class="text-muted">Awaiting your approval</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card kpi-warning">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Active Vehicles</small>
+                <div class="fs-4 fw-extrabold text-primary">{{ active_bookings|length }}</div>
+                <small class="text-muted">Currently parked</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Utilization Rate</small>
+                <div class="fs-4 fw-extrabold text-dark">{{ analytics.utilization_rate }}%</div>
+                <small class="text-muted">{{ spaces|length }} listed spaces</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Pending Requests Panel -->
+        <div class="col-lg-7">
+            <div class="card h-100 border-0 shadow-sm p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-warning me-2"></i> Pending Booking Requests</h5>
+                    <a href="{{ url_for('owner.booking_requests') }}" class="small text-decoration-none">Manage All</a>
+                </div>
+
+                {% if pending_bookings %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for b in pending_bookings[:4] %}
+                            <div class="p-3 bg-light rounded-3 border d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-bold text-dark">{{ b.driver.name }} <small class="text-muted">({{ b.vehicle_plate }})</small></div>
+                                    <div class="small text-muted">
+                                        {{ b.parking_space.title }} • {{ b.booking_date.strftime('%b %d') }} ({{ b.start_time.strftime('%H:%M') }}-{{ b.end_time.strftime('%H:%M') }})
+                                    </div>
+                                    <strong class="text-primary small">{{ b.total_price|currency }}</strong>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <form action="{{ url_for('owner.approve_booking', booking_id=b.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3">Approve</button>
+                                    </form>
+                                    <form action="{{ url_for('owner.reject_booking', booking_id=b.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">Reject</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-check2-circle fs-1 text-success d-block mb-2"></i>
+                        <p class="small mb-0">All caught up! No pending booking requests.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Spaces Status -->
+        <div class="col-lg-5">
+            <div class="card h-100 border-0 shadow-sm p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-p-circle-fill text-primary me-2"></i> My Parking Listings</h5>
+                    <a href="{{ url_for('owner.manage_spaces') }}" class="small text-decoration-none">View All</a>
+                </div>
+
+                {% if spaces %}
+                    <div class="d-flex flex-column gap-2">
+                        {% for s in spaces[:4] %}
+                            <div class="p-2 px-3 bg-light rounded-3 border d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong class="text-dark small d-block">{{ s.title }}</strong>
+                                    <small class="text-muted">{{ s.locality }} • {{ s.total_slots }} slots</small>
+                                </div>
+                                <span class="badge {{ 'bg-success' if s.is_active else 'bg-secondary' }}">
+                                    {{ 'ACTIVE' if s.is_active else 'INACTIVE' }}
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p class="small mb-2">You have not listed any spaces yet.</p>
+                        <a href="{{ url_for('owner.add_space') }}" class="btn btn-sm btn-success rounded-pill">List Space Now</a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

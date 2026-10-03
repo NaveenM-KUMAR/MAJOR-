@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Owner Account Status — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm p-4 text-center">
+                {% if user.owner_status == 'APPROVED' %}
+                    <div class="text-success mb-3 fs-1"><i class="bi bi-patch-check-fill"></i></div>
+                    <h3 class="fw-bold text-success">Owner Account Approved</h3>
+                    <p class="text-muted">Your property owner account has been verified by the administrator. You can now list community parking spaces and receive bookings.</p>
+                    <a href="{{ url_for('owner.dashboard') }}" class="btn btn-success rounded-pill px-4 fw-bold">Go to Owner Dashboard</a>
+                {% elif user.owner_status == 'REJECTED' %}
+                    <div class="text-danger mb-3 fs-1"><i class="bi bi-x-circle-fill"></i></div>
+                    <h3 class="fw-bold text-danger">Application Rejected</h3>
+                    <p class="text-muted">Your owner verification could not be completed.</p>
+                    {% if user.rejection_reason %}
+                        <div class="p-3 bg-danger-subtle text-danger rounded-3 border border-danger mb-4 text-start small">
+                            <strong>Reason:</strong> {{ user.rejection_reason }}
+                        </div>
+                    {% endif %}
+                    <p class="small text-muted">Please contact admin support to resolve documentation issues.</p>
+                {% elif user.owner_status == 'SUSPENDED' %}
+                    <div class="text-warning mb-3 fs-1"><i class="bi bi-exclamation-octagon-fill"></i></div>
+                    <h3 class="fw-bold text-dark">Account Suspended</h3>
+                    <p class="text-muted">Your owner capabilities are currently suspended by platform administration.</p>
+                {% else %}
+                    <div class="text-warning mb-3 fs-1"><i class="bi bi-hourglass-split"></i></div>
+                    <h3 class="fw-bold text-dark">Verification in Progress</h3>
+                    <p class="text-muted">
+                        Thank you for registering as a Community Parking Space Owner! Your identity and property address are currently being reviewed by our administration team.
+                    </p>
+                    <div class="p-3 bg-light rounded-3 border text-start small mb-4">
+                        <div class="mb-1"><strong>Submitted Address:</strong> {{ user.owner_address or 'Provided during registration' }}</div>
+                        <div><strong>Current Status:</strong> <span class="badge bg-warning text-dark">PENDING ADMIN APPROVAL</span></div>
+                    </div>
+                    <p class="small text-muted mb-0">You will be able to list parking spaces immediately once approved.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

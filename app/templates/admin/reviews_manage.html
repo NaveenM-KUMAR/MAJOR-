@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Review Moderation — Admin Console{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-0">Review Moderation Console</h3>
+            <p class="text-muted small mb-0">Ensure community guidelines and moderate inappropriate feedback</p>
+        </div>
+    </div>
+
+    {% if reviews %}
+        <div class="card border-0 shadow-sm overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Space</th>
+                            <th>Reviewer</th>
+                            <th>Rating</th>
+                            <th>Comment</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in reviews %}
+                            <tr>
+                                <td class="fw-bold text-dark">{{ r.parking_space.title }}</td>
+                                <td>{{ r.reviewer.name }}</td>
+                                <td class="text-warning">
+                                    {% for i in range(r.rating) %}<i class="bi bi-star-fill"></i>{% endfor %}
+                                </td>
+                                <td style="max-width: 300px;"><small class="text-secondary">{{ r.comment }}</small></td>
+                                <td><small class="text-muted">{{ r.created_at.strftime('%b %d, %Y') }}</small></td>
+                                <td>
+                                    <span class="badge {{ 'bg-danger' if r.is_moderated else 'bg-success' }}">
+                                        {{ 'HIDDEN (MODERATED)' if r.is_moderated else 'VISIBLE' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <form action="{{ url_for('admin.moderate_review', review_id=r.id) }}" method="POST">
+                                        <button type="submit" class="btn btn-sm {{ 'btn-outline-success' if r.is_moderated else 'btn-outline-warning' }} rounded-pill">
+                                            {{ 'Restore' if r.is_moderated else 'Hide/Flag' }}
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="card border-0 shadow-sm p-5 text-center text-muted">
+            <p class="mb-0">No reviews submitted on the platform yet.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}System Analytics & Demand Insights — Admin Console{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-lg-5 py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+        <div>
+            <h2 class="fw-bold mb-1">Platform Analytics & Intelligence</h2>
+            <p class="text-muted small mb-0">High-demand urban clusters, smart prediction statistics, and emergency usage</p>
+        </div>
+    </div>
+
+    <!-- Top Area Demand & Booking Status -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm p-4 h-100">
+                <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-fire text-danger"></i> High-Demand Locality Clusters
+                </h5>
+                {% if stats.top_areas %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Locality Cluster</th>
+                                    <th>Total Bookings</th>
+                                    <th>Gross Realized Volume</th>
+                                    <th>Demand Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for a in stats.top_areas %}
+                                    <tr>
+                                        <td class="fw-bold text-dark">{{ a.locality }}</td>
+                                        <td>{{ a.bookings }} bookings</td>
+                                        <td class="text-success fw-bold">{{ a.revenue|currency }}</td>
+                                        <td>
+                                            <span class="badge bg-danger-subtle text-danger border border-danger">
+                                                HIGH OCCUPANCY
+                                            </span>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted py-4 text-center">No area cluster data available yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm p-4 h-100">
+                <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-pie-chart-fill text-primary"></i> Booking Status Distribution
+                </h5>
+                <div style="height: 250px;">
+                    <canvas id="statusDonutChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Emergency Parking Usage Metrics -->
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-2 text-danger"><i class="bi bi-lightning-charge-fill me-2"></i> Emergency Mode Usage</h5>
+                <div class="display-6 fw-extrabold text-danger mb-2">{{ stats.emergency_bookings }}</div>
+                <p class="text-muted small mb-0">Total urgent fast-track reservations completed via Emergency Parking Mode.</p>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-0 shadow-sm p-4">
+                <h5 class="fw-bold mb-2 text-success"><i class="bi bi-check-circle-fill me-2"></i> Completed Sessions</h5>
+                <div class="display-6 fw-extrabold text-success mb-2">{{ stats.completed_bookings }}</div>
+                <p class="text-muted small mb-0">Successfully completed parking stays with verified QR checkout.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const labels = ['Completed', 'Active', 'Pending', 'Approved', 'Cancelled'];
+    const data = [
+        {{ stats.status_distribution.Completed }},
+        {{ stats.status_distribution.Active }},
+        {{ stats.status_distribution.Pending }},
+        {{ stats.status_distribution.Approved }},
+        {{ stats.status_distribution.Cancelled }}
+    ];
+    renderStatusDonut('statusDonutChart', labels, data);
+});
+</script>
+{% endblock %}

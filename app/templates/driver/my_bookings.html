@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+
+{% block title %}My Bookings — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="fw-bold mb-0">My Parking Reservations</h3>
+            <p class="text-muted small mb-0">Manage active, upcoming, and past parking sessions</p>
+        </div>
+        <a href="{{ url_for('driver.search') }}" class="btn btn-primary rounded-pill px-3 fw-bold">
+            <i class="bi bi-search me-1"></i> Book New Space
+        </a>
+    </div>
+
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-pills mb-4 gap-2" id="bookingTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active rounded-pill px-4 fw-bold" id="active-tab" data-bs-toggle="pill" data-bs-target="#active" type="button">
+                Active ({{ active_bookings|length }})
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill px-4 fw-bold" id="upcoming-tab" data-bs-toggle="pill" data-bs-target="#upcoming" type="button">
+                Upcoming ({{ upcoming_bookings|length }})
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill px-4 fw-bold" id="completed-tab" data-bs-toggle="pill" data-bs-target="#completed" type="button">
+                Completed ({{ completed_bookings|length }})
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link rounded-pill px-4 fw-bold" id="cancelled-tab" data-bs-toggle="pill" data-bs-target="#cancelled" type="button">
+                Cancelled ({{ cancelled_bookings|length }})
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tabs Content -->
+    <div class="tab-content" id="bookingTabsContent">
+        <!-- Active Tab -->
+        <div class="tab-pane fade show active" id="active">
+            {% if active_bookings %}
+                <div class="row g-4">
+                    {% for b in active_bookings %}
+                        <div class="col-md-6">
+                            <div class="card border-primary border-2 shadow-sm p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="fw-bold text-dark mb-0">{{ b.parking_space.title }}</h5>
+                                    <span class="badge bg-primary">ACTIVE</span>
+                                </div>
+                                <p class="text-muted small mb-2"><i class="bi bi-geo-alt me-1"></i>{{ b.parking_space.address }}</p>
+                                <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                    <div><strong>Checked-In:</strong> {{ b.check_in_time.strftime('%I:%M %p, %b %d') if b.check_in_time else 'Active' }}</div>
+                                    <div><strong>Vehicle:</strong> {{ b.vehicle_plate }} ({{ b.vehicle_type }})</div>
+                                    <div><strong>Fee:</strong> {{ b.total_price|currency }}</div>
+                                </div>
+                                <div class="d-flex gap-2 flex-wrap">
+                                    <a href="{{ url_for('driver.space_scan', space_id=b.parking_space_id, auto=1) }}" class="btn btn-warning text-dark rounded-pill flex-grow-1 fw-bold shadow-sm">
+                                        <i class="bi bi-box-arrow-right me-1"></i> Check-Out & Exit Now
+                                    </a>
+                                    <a href="{{ url_for('driver.scanner', mode='exit') }}" class="btn btn-outline-primary rounded-pill px-3">
+                                        <i class="bi bi-camera me-1"></i> Scan Sign
+                                    </a>
+                                    <a href="{{ url_for('driver.booking_ticket', booking_ref=b.booking_reference) }}" class="btn btn-outline-secondary rounded-pill px-3">
+                                        <i class="bi bi-qr-code me-1"></i> Pass
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card border-0 shadow-sm p-5 text-center text-muted">
+                    <p class="mb-0">No vehicle currently parked.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Upcoming Tab -->
+        <div class="tab-pane fade" id="upcoming">
+            {% if upcoming_bookings %}
+                <div class="row g-4">
+                    {% for b in upcoming_bookings %}
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="fw-bold text-dark mb-0">{{ b.parking_space.title }}</h5>
+                                    <span class="badge {{ b.status|badge_status }}">{{ b.status }}</span>
+                                </div>
+                                <p class="text-muted small mb-2"><i class="bi bi-geo-alt me-1"></i>{{ b.parking_space.address }}</p>
+                                
+                                <div class="mb-3 p-2 bg-warning-subtle text-warning-emphasis rounded-3 border border-warning-subtle small d-flex align-items-center">
+                                    <i class="bi bi-clock-history fs-5 me-2 flex-shrink-0 text-warning"></i>
+                                    <div>
+                                        <strong>30-Min Grace Window:</strong> Arrive by <strong>{{ b.start_time.strftime('%I:%M %p') }}</strong>. If not checked in within 30 minutes, slot is auto-cancelled & released.
+                                    </div>
+                                </div>
+
+                                <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                    <div><strong>Date:</strong> {{ b.booking_date.strftime('%b %d, %Y') }}</div>
+                                    <div><strong>Time:</strong> {{ b.start_time.strftime('%H:%M') }} – {{ b.end_time.strftime('%H:%M') }}</div>
+                                    <div><strong>Vehicle:</strong> {{ b.vehicle_plate }}</div>
+                                    <div><strong>Total:</strong> {{ b.total_price|currency }}</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <a href="{{ url_for('driver.booking_ticket', booking_ref=b.booking_reference) }}" class="btn btn-outline-primary rounded-pill flex-grow-1">
+                                        <i class="bi bi-qr-code me-1"></i> View Pass
+                                    </a>
+                                    <button type="button" class="btn btn-outline-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#cancelModal{{ b.id }}">
+                                        <i class="bi bi-x-circle me-1"></i> Cancel
+                                    </button>
+                                </div>
+
+                                <!-- Cancellation Modal -->
+                                <div class="modal fade" id="cancelModal{{ b.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content border-0 shadow">
+                                            <div class="modal-header border-0 pb-0">
+                                                <h5 class="modal-title fw-bold text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i>Cancel Reservation?</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                            </div>
+                                            <form action="{{ url_for('driver.cancel_booking', booking_id=b.id) }}" method="POST">
+                                                <div class="modal-body text-start">
+                                                    <p class="text-muted small">
+                                                        Are you sure you want to cancel your reservation for <strong>{{ b.parking_space.title }}</strong>?
+                                                        The bay will be immediately released for other drivers.
+                                                    </p>
+                                                    <div class="p-3 bg-success-subtle text-success-emphasis rounded-3 border border-success-subtle mb-3 small">
+                                                        <i class="bi bi-cash-stack me-1"></i> <strong>Full Refund:</strong> {{ b.total_price|currency }} will be refunded to your account.
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-semibold small">Reason for cancellation</label>
+                                                        <select name="cancellation_reason" class="form-select" required>
+                                                            <option value="Plans changed / No longer needed">Plans changed / No longer needed</option>
+                                                            <option value="Found alternative parking spot">Found alternative parking spot</option>
+                                                            <option value="Delayed / Unable to arrive on time">Delayed / Unable to arrive on time</option>
+                                                            <option value="Booked by mistake / wrong slot">Booked by mistake / wrong slot</option>
+                                                            <option value="Other reason">Other reason</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer border-0 pt-0">
+                                                    <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Keep Reservation</button>
+                                                    <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold">Confirm & Cancel</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card border-0 shadow-sm p-5 text-center text-muted">
+                    <p class="mb-0">No upcoming reservations.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Completed Tab -->
+        <div class="tab-pane fade" id="completed">
+            {% if completed_bookings %}
+                <div class="row g-4">
+                    {% for b in completed_bookings %}
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm p-4">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="fw-bold text-dark mb-0">{{ b.parking_space.title }}</h5>
+                                    <span class="badge bg-dark">COMPLETED</span>
+                                </div>
+                                <p class="text-muted small mb-2"><i class="bi bi-geo-alt me-1"></i>{{ b.parking_space.address }}</p>
+                                <div class="p-3 bg-light rounded-3 border mb-3 small">
+                                    <div><strong>Session Date:</strong> {{ b.booking_date.strftime('%b %d, %Y') }}</div>
+                                    <div><strong>Vehicle:</strong> {{ b.vehicle_plate }}</div>
+                                    <div><strong>Total Paid:</strong> {{ b.total_price|currency }}</div>
+                                </div>
+                                
+                                {% if b.review %}
+                                    <div class="p-2 bg-success-subtle text-success rounded-3 small border border-success-subtle">
+                                        <i class="bi bi-star-fill text-warning me-1"></i> Rated {{ b.review.rating }}/5: "{{ b.review.comment }}"
+                                    </div>
+                                {% else %}
+                                    <button class="btn btn-warning rounded-pill fw-bold text-dark" data-bs-toggle="modal" data-bs-target="#reviewModal{{ b.id }}">
+                                        <i class="bi bi-star-fill me-1"></i> Rate & Review
+                                    </button>
+
+                                    <!-- Rating Modal -->
+                                    <div class="modal fade" id="reviewModal{{ b.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content border-0 shadow">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title fw-bold">Rate Your Parking Session</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <form action="{{ url_for('driver.submit_review', booking_id=b.id) }}" method="POST">
+                                                    <div class="modal-body">
+                                                        <h6 class="fw-bold mb-3">{{ b.parking_space.title }}</h6>
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-semibold small">Rating (Stars)</label>
+                                                            <select name="rating" class="form-select" required>
+                                                                <option value="5">⭐⭐⭐⭐⭐ (5 Stars - Excellent)</option>
+                                                                <option value="4">⭐⭐⭐⭐ (4 Stars - Good)</option>
+                                                                <option value="3">⭐⭐⭐ (3 Stars - Average)</option>
+                                                                <option value="2">⭐⭐ (2 Stars - Poor)</option>
+                                                                <option value="1">⭐ (1 Star - Terrible)</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-semibold small">Written Review</label>
+                                                            <textarea name="comment" class="form-control" rows="3" placeholder="How was accessibility, security, and space convenience?" required></textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-primary rounded-pill fw-bold">Submit Review</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card border-0 shadow-sm p-5 text-center text-muted">
+                    <p class="mb-0">No completed sessions yet.</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Cancelled Tab -->
+        <div class="tab-pane fade" id="cancelled">
+            {% if cancelled_bookings %}
+                <div class="row g-4">
+                    {% for b in cancelled_bookings %}
+                        <div class="col-md-6">
+                            <div class="card border-0 shadow-sm p-4 opacity-85">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h5 class="fw-bold text-dark mb-0">{{ b.parking_space.title }}</h5>
+                                    <span class="badge bg-danger">CANCELLED</span>
+                                </div>
+                                <p class="text-muted small mb-2"><i class="bi bi-geo-alt me-1"></i>{{ b.parking_space.address }}</p>
+                                <div class="p-3 bg-light rounded-3 border small">
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span><strong>Date:</strong> {{ b.booking_date.strftime('%b %d, %Y') }}</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border">Slot Released</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span><strong>Refund Status:</strong></span>
+                                        <span class="badge bg-success-subtle text-success border border-success fw-bold">
+                                            <i class="bi bi-check-circle me-1"></i>{{ b.payment_status }} ({{ b.total_price|currency }})
+                                        </span>
+                                    </div>
+                                    {% if b.cancellation_reason %}
+                                        <div class="text-danger mt-2 pt-2 border-top">
+                                            <i class="bi bi-info-circle me-1"></i><strong>Reason:</strong> {{ b.cancellation_reason }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="card border-0 shadow-sm p-5 text-center text-muted">
+                    <p class="mb-0">No cancelled reservations.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Preserve tab selection on page refresh
+    const hash = window.location.hash;
+    const savedTab = sessionStorage.getItem('cps_my_bookings_tab');
+    const targetTab = hash || savedTab;
+
+    if (targetTab) {
+        const triggerEl = document.querySelector(`button[data-bs-target="${targetTab}"]`);
+        if (triggerEl && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(triggerEl).show();
+        }
+    }
+
+    const tabButtons = document.querySelectorAll('#bookingTabs button[data-bs-toggle="pill"]');
+    tabButtons.forEach(btn => {
+        btn.addEventListener('shown.bs.tab', (e) => {
+            const target = e.target.getAttribute('data-bs-target');
+            if (target) {
+                history.replaceState(null, null, target);
+                sessionStorage.setItem('cps_my_bookings_tab', target);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

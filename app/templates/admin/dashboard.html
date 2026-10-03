@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Command Center — Community Parking System{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-lg-5 py-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
+        <div>
+            <div class="badge bg-warning text-dark px-3 py-1 rounded-pill mb-1 fw-bold">ADMINISTRATOR CONTROL CONSOLE</div>
+            <h2 class="fw-bold mb-0">System Operations & Oversight</h2>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin.owners_approval') }}" class="btn btn-primary rounded-pill px-3 fw-bold">
+                <i class="bi bi-shield-check me-1"></i> Owner Verification ({{ analytics.pending_owners }})
+            </a>
+            <a href="{{ url_for('admin.analytics') }}" class="btn btn-outline-dark rounded-pill px-3 fw-semibold">
+                <i class="bi bi-graph-up me-1"></i> Analytics Deep-Dive
+            </a>
+        </div>
+    </div>
+
+    <!-- Core KPIs -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card kpi-success">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Total Drivers</small>
+                <div class="fs-4 fw-extrabold text-dark">{{ analytics.total_users }}</div>
+                <small class="text-muted">Registered motorists</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card kpi-warning">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Property Owners</small>
+                <div class="fs-4 fw-extrabold text-primary">{{ analytics.total_owners }} <small class="fs-6 text-warning">({{ analytics.pending_owners }} pending)</small></div>
+                <small class="text-muted">Space providers</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Active Parking Spaces</small>
+                <div class="fs-4 fw-extrabold text-success">{{ analytics.active_spaces }} / {{ analytics.total_spaces }}</div>
+                <small class="text-muted">Live listings</small>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card p-3 border-0 shadow-sm kpi-card kpi-danger">
+                <small class="text-muted text-uppercase fw-bold" style="font-size: 0.72rem;">Platform Volume</small>
+                <div class="fs-4 fw-extrabold text-dark">{{ analytics.total_gross_volume|currency }}</div>
+                <small class="text-muted">{{ analytics.total_bookings }} total reservations</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Navigation Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-2">
+            <a href="{{ url_for('admin.owners_approval') }}" class="card p-3 border-0 shadow-sm text-decoration-none card-hover text-dark h-100">
+                <div class="fs-3 text-primary mb-1"><i class="bi bi-person-badge"></i></div>
+                <div class="fw-bold">Owner Verification</div>
+                <small class="text-muted">Approve hosts</small>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ url_for('admin.spaces_manage') }}" class="card p-3 border-0 shadow-sm text-decoration-none card-hover text-dark h-100">
+                <div class="fs-3 text-success mb-1"><i class="bi bi-p-square"></i></div>
+                <div class="fw-bold">Spaces Moderation</div>
+                <small class="text-muted">Manage listings</small>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ url_for('admin.bookings_manage') }}" class="card p-3 border-0 shadow-sm text-decoration-none card-hover text-dark h-100">
+                <div class="fs-3 text-info mb-1"><i class="bi bi-ticket-detailed"></i></div>
+                <div class="fw-bold">All Bookings</div>
+                <small class="text-muted">Live & historical</small>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ url_for('admin.users_manage') }}" class="card p-3 border-0 shadow-sm text-decoration-none card-hover text-dark h-100">
+                <div class="fs-3 text-warning mb-1"><i class="bi bi-people-fill"></i></div>
+                <div class="fw-bold">Users & Drivers</div>
+                <small class="text-muted">Manage accounts</small>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ url_for('admin.reviews_manage') }}" class="card p-3 border-0 shadow-sm text-decoration-none card-hover text-dark h-100">
+                <div class="fs-3 text-secondary mb-1"><i class="bi bi-star-half"></i></div>
+                <div class="fw-bold">Review Moderation</div>
+                <small class="text-muted">Ratings & feedback</small>
+            </a>
+        </div>
+        <div class="col-6 col-md-2">
+            <a href="{{ url_for('admin.audit_logs') }}" class="card p-3 border-0 shadow-sm text-decoration-none card-hover text-dark h-100">
+                <div class="fs-3 text-danger mb-1"><i class="bi bi-journal-text"></i></div>
+                <div class="fw-bold">System Audit Logs</div>
+                <small class="text-muted">Security trail</small>
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Pending Owner Applications Table -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-hourglass-split text-warning me-2"></i> Pending Owner Verifications</h5>
+                    <a href="{{ url_for('admin.owners_approval') }}" class="small text-decoration-none">View All</a>
+                </div>
+
+                {% if pending_owners %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for owner in pending_owners %}
+                            <div class="p-3 bg-light rounded-3 border d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong class="text-dark">{{ owner.name }}</strong> ({{ owner.email }})
+                                    <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ owner.owner_address or 'Address not provided' }}</div>
+                                    <div class="small text-muted">Phone: {{ owner.phone }}</div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <form action="{{ url_for('admin.handle_owner_action', user_id=owner.id) }}" method="POST">
+                                        <input type="hidden" name="action" value="APPROVE">
+                                        <button type="submit" class="btn btn-sm btn-success rounded-pill px-3">Approve</button>
+                                    </form>
+                                    <form action="{{ url_for('admin.handle_owner_action', user_id=owner.id) }}" method="POST">
+                                        <input type="hidden" name="action" value="REJECT">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">Reject</button>
+                                    </form>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-check-circle fs-2 text-success d-block mb-1"></i>
+                        <p class="small mb-0">No pending owner applications awaiting review.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Audit Activity -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm p-4 h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-primary me-2"></i> Recent Audit Events</h5>
+                    <a href="{{ url_for('admin.audit_logs') }}" class="small text-decoration-none">Full Logs</a>
+                </div>
+
+                {% if recent_logs %}
+                    <div class="d-flex flex-column gap-2">
+                        {% for log in recent_logs %}
+                            <div class="p-2 px-3 bg-light rounded-3 border small">
+                                <div class="d-flex justify-content-between">
+                                    <strong class="text-dark">{{ log.action }}</strong>
+                                    <span class="text-muted" style="font-size: 0.72rem;" title="{{ log.created_at|format_datetime }}">{{ log.created_at|time_ago }}</span>
+                                </div>
+                                <div class="text-muted text-truncate">{{ log.details }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted small text-center py-4">No audit logs recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

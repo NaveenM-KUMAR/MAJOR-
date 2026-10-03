@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}QR Scanner & Check-In Terminal — Community Parking System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .scanner-viewport {
+        position: relative;
+        height: 280px;
+        background: #0f172a;
+        border-radius: 1.25rem;
+        overflow: hidden;
+    }
+
+    .scanner-box {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 190px;
+        height: 190px;
+        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.55);
+        border-radius: 16px;
+        pointer-events: none;
+    }
+
+    .scanner-corner {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        border: 3.5px solid #10b981;
+    }
+    .corner-tl { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 12px; }
+    .corner-tr { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 12px; }
+    .corner-bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 12px; }
+    .corner-br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 12px; }
+
+    .scanner-laser {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #10b981, #34d399, #10b981, transparent);
+        box-shadow: 0 0 12px #10b981, 0 0 4px #059669;
+        opacity: 0;
+        animation: laserScanOwner 2s infinite ease-in-out;
+    }
+
+    .scanner-active .scanner-laser {
+        opacity: 1;
+    }
+
+    @keyframes laserScanOwner {
+        0% { top: 6%; }
+        50% { top: 92%; }
+        100% { top: 6%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-0 shadow-sm p-4 text-center">
+                <div class="brand-icon d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle p-3 mb-2 mx-auto" style="width: 60px; height: 60px;">
+                    <i class="bi bi-shield-check fs-3"></i>
+                </div>
+                <h3 class="fw-bold mb-1">Gatekeeper QR Terminal</h3>
+                <p class="text-muted small mb-3">Scan driver's mobile pass or enter booking token for Check-In / Check-Out</p>
+
+                <div class="alert alert-info py-2 px-3 small text-start rounded-3 mb-3 border-0 bg-info-subtle text-info-emphasis">
+                    <i class="bi bi-info-circle-fill me-1"></i>
+                    <strong>Self-Service Wall Mode:</strong> Drivers can also check in automatically by scanning your printed 
+                    <a href="{{ url_for('owner.manage_spaces') }}" class="fw-bold text-decoration-underline text-info-emphasis">Wall Signboard</a>.
+                </div>
+
+                <!-- Camera Live Scanner -->
+                <div class="scanner-viewport mb-3" id="viewportContainer">
+                    <video id="cameraVideo" autoplay playsinline muted class="w-100 h-100 object-fit-cover"></video>
+                    <canvas id="scannerCanvas" class="d-none"></canvas>
+
+                    <div class="scanner-box" id="scannerBox">
+                        <div class="scanner-corner corner-tl"></div>
+                        <div class="scanner-corner corner-tr"></div>
+                        <div class="scanner-corner corner-bl"></div>
+                        <div class="scanner-corner corner-br"></div>
+                        <div class="scanner-laser"></div>
+                    </div>
+
+                    <div class="position-absolute bottom-0 start-50 translate-middle-x mb-2 text-center" style="z-index: 5;">
+                        <span id="scanBadge" class="badge bg-dark bg-opacity-75 px-3 py-1 rounded-pill small border border-secondary shadow-sm">
+                            <i class="bi bi-camera me-1"></i> Point at Driver's Ticket Pass
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Camera Action Controls -->
+                <div class="d-flex justify-content-center align-items-center gap-2 flex-wrap mb-4">
+                    <button id="startCamBtn" class="btn btn-primary rounded-pill px-4 btn-sm fw-semibold shadow-sm">
+                        <i class="bi bi-camera-video-fill me-1"></i> Activate Camera
+                    </button>
+                    <button id="switchCamBtn" class="btn btn-outline-secondary rounded-pill px-3 btn-sm fw-semibold d-none">
+                        <i class="bi bi-arrow-repeat me-1"></i> Switch Camera
+                    </button>
+                    <label class="btn btn-outline-primary rounded-pill px-3 btn-sm fw-semibold mb-0" style="cursor: pointer;">
+                        <i class="bi bi-image me-1"></i> Upload QR Pass Photo
+                        <input type="file" id="qrFileInput" accept="image/*" class="d-none">
+                    </label>
+                </div>
+
+                <div id="camStatus" class="small text-muted mb-3">
+                    Tap "Activate Camera" to scan driver QR passes directly with your device camera.
+                </div>
+
+                <div class="d-flex align-items-center mb-3">
+                    <hr class="flex-grow-1 my-0">
+                    <span class="px-3 text-muted small text-uppercase fw-bold">OR ENTER TOKEN MANUALLY</span>
+                    <hr class="flex-grow-1 my-0">
+                </div>
+
+                <form method="POST" action="{{ url_for('owner.scanner') }}" id="ownerScannerForm">
+                    <div class="mb-3 text-start">
+                        <label class="form-label fw-semibold small">Action Type</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check card p-2 flex-grow-1 border-primary bg-light">
+                                <input class="form-check-input ms-1" type="radio" name="action_type" id="actionIn" value="CHECK_IN" checked>
+                                <label class="form-check-label fw-bold ms-2 text-dark" for="actionIn">
+                                    <i class="bi bi-box-arrow-in-right text-success me-1"></i> Driver Arrival (Check-In)
+                                </label>
+                            </div>
+                            <div class="form-check card p-2 flex-grow-1">
+                                <input class="form-check-input ms-1" type="radio" name="action_type" id="actionOut" value="CHECK_OUT">
+                                <label class="form-check-label fw-bold ms-2 text-dark" for="actionOut">
+                                    <i class="bi bi-box-arrow-right text-primary me-1"></i> Driver Departure (Check-Out)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 text-start">
+                        <label class="form-label fw-semibold small">QR Code Token / Payload String</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white"><i class="bi bi-upc-scan text-muted"></i></span>
+                            <input type="text" id="qrTokenInput" name="qr_token" class="form-control font-monospace" placeholder="e.g. CPS-QR-xxxxxxxx..." required autofocus>
+                        </div>
+                        <small class="text-muted" style="font-size: 0.75rem;">Will auto-populate upon scanning or can be entered manually.</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 rounded-pill fw-bold shadow-sm">
+                        <i class="bi bi-shield-check me-1"></i> Verify & Process Token
+                    </button>
+                </form>
+
+                <div class="mt-4 p-3 bg-light rounded-3 text-start small text-muted border">
+                    <h6 class="fw-bold text-dark mb-1"><i class="bi bi-info-circle-fill text-primary me-1"></i> Terminal Workflow:</h6>
+                    <ul class="mb-0 ps-3">
+                        <li><strong>Check-In:</strong> Validates APPROVED status and marks the booking as ACTIVE with entry timestamp.</li>
+                        <li><strong>Check-Out:</strong> Validates ACTIVE status, marks COMPLETED, calculates duration, and credits your revenue dashboard.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/jsqr.min.js') }}"></script>
+<script>
+(() => {
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('scannerCanvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const startCamBtn = document.getElementById('startCamBtn');
+    const switchCamBtn = document.getElementById('switchCamBtn');
+    const qrFileInput = document.getElementById('qrFileInput');
+    const camStatus = document.getElementById('camStatus');
+    const scanBadge = document.getElementById('scanBadge');
+    const viewportContainer = document.getElementById('viewportContainer');
+    const qrTokenInput = document.getElementById('qrTokenInput');
+    const form = document.getElementById('ownerScannerForm');
+
+    let stream = null;
+    let isScanning = false;
+    let currentFacingMode = 'environment';
+    let animationFrameId = null;
+    let barcodeDetector = null;
+
+    if ('BarcodeDetector' in window) {
+        try {
+            barcodeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+        } catch (e) {
+            barcodeDetector = null;
+        }
+    }
+
+    function playBeep() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const audioCtx = new AudioCtx();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.12);
+
+            gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + 0.12);
+        } catch (e) {}
+    }
+
+    async function startCamera(facingMode = 'environment') {
+        stopCamera();
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            camStatus.innerHTML = '<span class="text-danger">Camera API not supported on this browser.</span>';
+            return;
+        }
+
+        try {
+            camStatus.innerHTML = '<span class="text-primary"><i class="bi bi-hourglass-split me-1"></i>Requesting camera...</span>';
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } }
+            });
+            video.srcObject = stream;
+            await video.play();
+
+            isScanning = true;
+            viewportContainer.classList.add('scanner-active');
+            startCamBtn.innerHTML = '<i class="bi bi-stop-circle-fill me-1"></i> Stop Camera';
+            startCamBtn.classList.remove('btn-primary');
+            startCamBtn.classList.add('btn-outline-danger');
+            switchCamBtn.classList.remove('d-none');
+
+            camStatus.innerHTML = '<span class="text-success"><i class="bi bi-broadcast me-1"></i>Scanner active. Align QR ticket pass.</span>';
+            scanBadge.innerHTML = '<i class="bi bi-eye-fill me-1"></i> Scanning active...';
+            scanBadge.className = 'badge bg-success bg-opacity-75 px-3 py-1 rounded-pill small border border-success';
+
+            requestAnimationFrame(scanLoop);
+        } catch (err) {
+            if (facingMode === 'environment') {
+                try {
+                    startCamera('user');
+                    return;
+                } catch (e) {}
+            }
+            camStatus.innerHTML = '<span class="text-warning">Camera unavailable. Please enter token manually or upload photo.</span>';
+        }
+    }
+
+    function stopCamera() {
+        isScanning = false;
+        if (animationFrameId) {
+            cancelAnimationFrame(animationFrameId);
+            animationFrameId = null;
+        }
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+        }
+        viewportContainer.classList.remove('scanner-active');
+        startCamBtn.innerHTML = '<i class="bi bi-camera-video-fill me-1"></i> Activate Camera';
+        startCamBtn.classList.remove('btn-outline-danger');
+        startCamBtn.classList.add('btn-primary');
+    }
+
+    async function scanLoop() {
+        if (!isScanning) return;
+
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            const vWidth = video.videoWidth;
+            const vHeight = video.videoHeight;
+            if (vWidth > 0 && vHeight > 0) {
+                canvas.width = vWidth;
+                canvas.height = vHeight;
+                ctx.drawImage(video, 0, 0, vWidth, vHeight);
+
+                let detected = null;
+
+                if (barcodeDetector) {
+                    try {
+                        const barcodes = await barcodeDetector.detect(canvas);
+                        if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                            detected = barcodes[0].rawValue;
+                        }
+                    } catch (e) {}
+                }
+
+                if (!detected && window.jsQR) {
+                    try {
+                        const imgData = ctx.getImageData(0, 0, vWidth, vHeight);
+                        const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "dontInvert" });
+                        if (code && code.data) {
+                            detected = code.data;
+                        }
+                    } catch (e) {}
+                }
+
+                if (detected) {
+                    onQrFound(detected);
+                    return;
+                }
+            }
+        }
+
+        animationFrameId = requestAnimationFrame(scanLoop);
+    }
+
+    function onQrFound(data) {
+        playBeep();
+        stopCamera();
+        qrTokenInput.value = data.trim();
+        camStatus.innerHTML = `<span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Scanned: ${data.trim()}</span>`;
+        scanBadge.innerHTML = '<i class="bi bi-check-lg me-1"></i> Token Captured!';
+        scanBadge.className = 'badge bg-success px-3 py-1 rounded-pill small';
+
+        // Auto-submit after short visual confirmation
+        setTimeout(() => {
+            form.submit();
+        }, 500);
+    }
+
+    qrFileInput.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0, img.width, img.height);
+                if (window.jsQR) {
+                    const imgData = ctx.getImageData(0, 0, img.width, img.height);
+                    const code = jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: "attemptBoth" });
+                    if (code && code.data) {
+                        onQrFound(code.data);
+                        return;
+                    }
+                }
+                camStatus.innerHTML = '<span class="text-danger">No valid QR code found in uploaded image.</span>';
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    startCamBtn.addEventListener('click', () => {
+        if (isScanning) {
+            stopCamera();
+            camStatus.textContent = 'Camera paused.';
+        } else {
+            startCamera(currentFacingMode);
+        }
+    });
+
+    switchCamBtn.addEventListener('click', () => {
+        currentFacingMode = (currentFacingMode === 'environment') ? 'user' : 'environment';
+        startCamera(currentFacingMode);
+    });
+
+    window.addEventListener('beforeunload', () => stopCamera());
+})();
+</script>
+{% endblock %}
